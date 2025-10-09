@@ -1,0 +1,265 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Tracker Board</title>
+  <style>
+    body{font-family:system-ui,Arial;margin:0;background:#0b0c10;color:#eaeaea}
+    header{display:flex;gap:12px;align-items:center;padding:12px 16px;background:#111}
+    input,button,select{padding:8px;border-radius:8px;border:1px solid #333;background:#1b1f23;color:#eaeaea}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px}
+    .card{border:1px solid #2a2a2a;border-radius:12px;padding:12px;background:#141414}
+    .muted{opacity:.8;font-size:12px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .badge{padding:2px 8px;border-radius:999px;background:#222;border:1px solid #333}
+  </style>
+</head>
+<body>
+  <header class="row" style="justify-content:space-between;align-items:center;padding:10px 20px;">
+    <div>
+      <strong>Tracker Board</strong>
+      <span id="authStatus" style="margin-left:10px;color:limegreen"></span>
+    </div>
+    <div class="row">
+      <input id="username" placeholder="username" />
+      <input id="password" placeholder="password" type="password" />
+      <button id="loginBtn">Login</button>
+      <button id="logoutBtn" style="display:none;">Logout</button>
+      <select id="sortBy">
+        <option value="updatedAt">updated</option>
+        <option value="level">level</option>
+      </select>
+    </div>
+  </header>
+  
+<div class="grid" id="grid"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const API = 'http://localhost:8080/api';
+  let token = localStorage.getItem('token') || '';
+  let nickname = localStorage.getItem('nickname') || '';
+
+  const authStatus = document.getElementById('authStatus');
+  const loginSection = document.querySelector('header .row:nth-child(2)');
+  const grid = document.getElementById('grid');
+  const sortSelect = document.getElementById('sortBy');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  function setAuthStatus() {
+    if (token) {
+      authStatus.innerHTML = `🟢 Logged in as <strong>${nickname}</strong>`;
+      loginSection.querySelector('#username').style.display = 'none';
+      loginSection.querySelector('#password').style.display = 'none';
+      loginSection.querySelector('#loginBtn').style.display = 'none';
+      logoutBtn.style.display = 'inline-block';
+    } else {
+      authStatus.innerHTML = "🔒 Viewer";
+      loginSection.querySelector('#username').style.display = 'inline-block';
+      loginSection.querySelector('#password').style.display = 'inline-block';
+      loginSection.querySelector('#loginBtn').style.display = 'inline-block';
+      logoutBtn.style.display = 'none';
+    }
+  }
+  setAuthStatus();
+
+  document.getElementById('loginBtn').onclick = async () => {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+    const r = await fetch(API + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const j = await r.json();
+    if (j.token) {
+      token = j.token;
+      const payload = JSON.parse(atob(j.token.split('.')[1]));
+      nickname = payload.nickname || payload.username;
+      localStorage.setItem('token', token);
+      localStorage.setItem('nickname', nickname);
+      setAuthStatus();
+      load(sortSelect.value);
+    } else {
+      alert(j.error || 'Login failed');
+    }
+  };
+
+  logoutBtn.onclick = () => {
+    localStorage.clear();
+    token = '';
+    nickname = '';
+    setAuthStatus();
+    grid.innerHTML = '';
+  };
+
+  async function load(sortBy = 'updatedAt') {
+    const r = await fetch(`${API}/trackers?sortBy=${encodeURIComponent(sortBy)}`);
+    const items = await r.json();
+    render(items);
+  }
+
+  function fmtAgo(ts) {
+    const d = new Date(ts);
+    const s = (Date.now() - d) / 1000;
+    if (s < 60) return Math.floor(s) + 's ago';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    return Math.floor(s / 3600) + 'h ago';
+  }
+
+  function render(items) {
+    grid.innerHTML = '';
+    if (!items.length) {
+      grid.innerHTML = "<p style='opacity:0.7;text-align:center;'>No trackers yet. Click below to add one.</p>";
+      return;
+    }
+    for (const t of items) {
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.innerHTML = `
+        <div class="row">
+          <div class="badge">Ep ${t.episodeId}</div>
+          <div class="badge">Map ${t.mapId} (${t.level})</div>
+          <div class="badge">Ch ${t.channelId}</div>
+        </div>
+        <h3 style="margin:8px 0">${t.user?.nickname || t.user?.username || nickname}</h3>
+        <div class="row"><strong>Status:</strong> <span>${t.status.toFixed(1)}</span></div>
+        <div class="muted">created ${fmtAgo(t.createdAt)}, updated ${fmtAgo(t.updatedAt)} by ${t.user?.nickname || t.user?.username}</div>
+        ${
+          token
+            ? `<div class="row" style="margin-top:8px">
+                <input type="number" step="0.1" min="0" max="5" value="${t.status}" id="st-${t.id}">
+                <button data-id="${t.id}" class="upd">Update</button>
+              </div>`
+            : ''
+        }
+      `;
+      grid.appendChild(el);
+    }
+
+    document.querySelectorAll('.upd').forEach(btn => {
+      btn.onclick = () => {
+        const id = Number(btn.dataset.id);
+        const val = Number(document.getElementById('st-' + id).value);
+        sio.emit('tracker:update', { id, status: val }, (resp) => {
+          if (resp?.error) alert(resp.error);
+        });
+      };
+    });
+  }
+
+  const sio = io('http://localhost:8080', { auth: { token } });
+  sio.on('connect', () => console.log('🟢 Socket connected'));
+  sio.on('tracker:changed:global', () => load(sortSelect.value));
+  sio.on('tracker:created:global', () => load(sortSelect.value));
+
+  sortSelect.onchange = (e) => load(e.target.value);
+  load();
+
+  // --- Add Tracker Toggle Form ---
+  const formBox = document.createElement('div');
+  formBox.innerHTML = `
+    <div style="padding:16px;text-align:center">
+      <button id="toggleAddBtn">➕ Add Tracker</button>
+      <div id="addForm" style="display:none;margin-top:12px;text-align:left;padding:10px;border:1px solid #666;border-radius:8px;">
+        <label>Episode:</label><br>
+        <select id="episodeSelect"></select><br>
+        <label>Map:</label><br>
+        <select id="mapSelect"></select><br>
+        <label>Channel:</label><br>
+        <select id="channelSelect"></select><br>
+        <label>Status:</label><br>
+        <select id="statusSelect">
+          <option value="0">0 (Off)</option>
+          <option value="1">1/4</option>
+          <option value="2">2/4</option>
+          <option value="3">3/4</option>
+          <option value="4">4/4</option>
+          <option value="5">ON</option>
+        </select>
+        <input id="manualStatus" placeholder="or manual (e.g. 1.5)" type="text" style="width:80px;margin-left:6px;"><br><br>
+        <button id="addBtn">Add</button>
+        <button id="clearBtn">Clear</button>
+      </div>
+    </div>
+  `;
+  document.body.insertBefore(formBox, grid);
+
+  document.getElementById('toggleAddBtn').onclick = async () => {
+    const addForm = document.getElementById('addForm');
+    addForm.style.display = addForm.style.display === 'none' ? 'block' : 'none';
+    if (addForm.style.display === 'block') {
+      const ep = await (await fetch(API + '/episodes')).json();
+      const epSel = document.getElementById('episodeSelect');
+      epSel.innerHTML = ep.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+      loadMaps();
+    }
+  };
+
+  async function loadMaps() {
+  const epId = document.getElementById('episodeSelect').value;
+  const maps = await (await fetch(API + `/episodes/${epId}/maps`)).json();
+  const mapSel = document.getElementById('mapSelect');
+  mapSel.innerHTML = maps.map(m =>
+    `<button class="mapBtn" data-id="${m.id}">${m.name}</button>`
+  ).join(' ');
+  document.querySelectorAll('.mapBtn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.mapBtn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      loadChannels(); // static 1-10
+    };
+  });
+}
+
+function loadChannels() {
+  const chSel = document.getElementById('channelSelect');
+  chSel.innerHTML = Array.from({ length: 10 }, (_, i) => i + 1)
+    .map(ch => `<button class="chBtn" data-id="${ch}">Ch ${ch}</button>`)
+    .join(' ');
+  document.querySelectorAll('.chBtn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.chBtn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+  });
+}
+
+
+  document.getElementById('episodeSelect').onchange = loadMaps;
+  document.getElementById('mapSelect').onchange = loadChannels;
+
+  document.getElementById('clearBtn').onclick = () => {
+    document.getElementById('statusSelect').value = 0;
+    document.getElementById('manualStatus').value = '';
+  };
+
+  document.getElementById('addBtn').onclick = async () => {
+    if (!token) return alert('Please login first.');
+    const episodeId = Number(document.getElementById('episodeSelect').value);
+    const mapId = Number(document.getElementById('mapSelect').value);
+    const channelId = Number(document.getElementById('channelSelect').value);
+    let status = Number(document.getElementById('manualStatus').value || document.getElementById('statusSelect').value);
+    const level = document.getElementById('mapSelect').selectedOptions[0].text;
+    const r = await fetch(API + '/trackers', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ episodeId, mapId, channelId, level, status, nickname })
+    });
+    const j = await r.json();
+    if (j.id) {
+      alert('Tracker added!');
+      document.getElementById('manualStatus').value = '';
+      document.getElementById('statusSelect').value = 0;
+      load();
+    } else {
+      alert(JSON.stringify(j));
+    }
+  };
+</script>
+
+
+
+</body>
+</html>

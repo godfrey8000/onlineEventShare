@@ -105,3 +105,233 @@ body { background: var(--bg); color: var(--text); }
     background-color: #f9f9f9;
   }
 }
+
+/* =========================================================
+   Tracker UI — Safe, component-scoped additions
+   (Append at end of style.css)
+   ========================================================= */
+
+/* Layout containers */
+.tracker-board {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 0 auto 18px;
+  max-width: 1200px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.25);
+}
+
+.tracker-board h3 {
+  text-align: left;
+  margin: 10px 0 8px;
+}
+
+/* Responsive grids for episode/map buttons */
+.tracker-grid,
+.btn-grid,
+.btn-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Dedicated button class to avoid global button conflicts */
+.btn {
+  background: #1f1f1f;
+  color: var(--text);
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.04s ease, border-color 0.15s ease;
+  user-select: none;
+}
+
+.btn:hover { background: #2a2a2a; border-color: #505050; }
+.btn:active { transform: translateY(1px); }
+
+/* Selected/active state */
+.btn.active {
+  background: #ffd24d;
+  color: #000;
+  border-color: #ffd24d;
+  font-weight: 600;
+}
+
+/* Small “star” toggle inside map buttons for favourites */
+.btn .star {
+  margin-left: 6px;
+  font-size: 12px;
+  opacity: 0.9;
+  pointer-events: auto;
+}
+
+/* Add-Tracker panel */
+.add-tracker {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 18px;
+  color: var(--text);
+  max-width: 980px;
+  margin: 0 auto 20px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.2);
+  text-align: left;
+}
+
+.add-tracker h3 {
+  margin: 0 0 12px;
+  color: var(--text);
+}
+
+.add-tracker .section {
+  margin: 12px 0;
+}
+
+.add-tracker .section-label {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 4px 0 8px;
+  color: #cfcfcf;
+}
+
+.add-tracker .sub-label {
+  font-size: 12px;
+  opacity: 0.85;
+  margin: 6px 0 6px;
+}
+
+/* Status manual input */
+.add-tracker .manual {
+  margin-left: 8px;
+  padding: 6px 8px;
+  border: 1px solid #3a3a3a;
+  background: #171717;
+  color: var(--text);
+  border-radius: 8px;
+  width: 120px;
+  outline: none;
+}
+
+.add-tracker .manual::placeholder { color: #9f9f9f; }
+
+/* Action buttons (use .btn to avoid global button style conflicts) */
+.add-tracker .actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.add-tracker .add-btn,
+.add-tracker .clear-btn {
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-tracker .add-btn {
+  background: #42d26f; /* green */
+  color: #0d0d0d;
+}
+
+.add-tracker .clear-btn {
+  background: #e34d3e; /* red */
+  color: #fff;
+}
+
+/* Connected users floating button & panel */
+.connected-btn {
+  position: fixed;
+  bottom: 70px;
+  right: 20px;
+  padding: 10px 14px;
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  background: #1f1f1f;
+  color: var(--text);
+  cursor: pointer;
+  z-index: 1000;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+
+.user-panel {
+  position: fixed;
+  bottom: 120px;
+  right: 20px;
+  background: #1b1b1b;
+  border: 1px solid #2d2d2d;
+  padding: 12px;
+  border-radius: 10px;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.35);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.user-panel .user-item {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+/* Bottom-right update time */
+.updateTime {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  font-size: 12px;
+  opacity: 0.75;
+  color: var(--text);
+  z-index: 900;
+}
+
+/* Language selector (if present in LoginBar) */
+.lang-select {
+  background: #1f1f1f;
+  color: var(--text);
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+/* Helpers when using lists of boxes for trackers */
+.tracker-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.tracker-card {
+  background: #171717;
+  border: 1px solid #2d2d2d;
+  border-radius: 10px;
+  padding: 10px;
+  text-align: left;
+}
+
+/* Ensure our cards and panels respect theme variables */
+.card,
+.tracker-board,
+.add-tracker,
+.user-panel {
+  background: var(--card);
+  color: var(--text);
+}
+
+/* Prefer consistent box sizing across components */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+

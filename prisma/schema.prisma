@@ -19,8 +19,8 @@ model Map {
   id        Int      @id @default(autoincrement())
   name      String
   level     Int
-  episode   Episode  @relation(fields: [episodeId], references: [id])
-  episodeId Int
+  episode        Episode  @relation(fields: [episodeNumber], references: [episodeId])  // ✅ Relation field
+  episodeNumber  Int      // ✅ Scalar field (foreign key)
   trackers  Tracker[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -66,6 +66,7 @@ model MapFavorite {
 
 model Episode {
   id        Int         @id @default(autoincrement())
+  episodeId Int         @unique
   name      String
   maps      Map[]
   trackers  Tracker[]
@@ -81,7 +82,7 @@ model Tracker {
   userId     Int?
   channelId  Int
   level      Int?
-  status     String
+  status     Decimal    @default(0)
   nickname   String?
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt

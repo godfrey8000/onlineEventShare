@@ -33,7 +33,7 @@ router.post('/trackers', authRequired, authorizeRole('EDITOR', 'ADMIN'), async (
   try {
     const data = parsed.data;
     const tracker = await prisma.tracker.create({
-      data: { ...data, createdBy: req.user.id },
+      data: { ...data, userId: req.user.id },
     });
     res.json(tracker);
   } catch (err) {

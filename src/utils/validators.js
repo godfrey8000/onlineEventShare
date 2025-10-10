@@ -8,14 +8,14 @@ export const RegisterSchema = z.object({
 export const LoginSchema = RegisterSchema;
 
 export const UpsertEpisode = z.object({ name: z.string().min(1) });
-export const UpsertMap = z.object({ name: z.string().min(1), episodeId: z.number().int() });
+export const UpsertMap = z.object({ name: z.string().min(1), episodeNumber: z.number().int(),level: z.number().min(1) });
 export const UpsertChannel = z.object({ name: z.string().min(1), mapId: z.number().int() });
 
 export const CreateTracker = z.object({
-  episodeId: z.number().int(),
+  episodeNumber: z.number().int(),
   mapId: z.number().int(),
   channelId: z.number().int(),
-  level: z.string().min(1),
+  level: z.number().min(1),
   status: z.number().min(0).max(5),
   nickname: z.string().min(1)
 });

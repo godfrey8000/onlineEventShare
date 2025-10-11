@@ -7,10 +7,16 @@ const onlineUsers = new Map() // socket.id → { id, username, nickname, role }
 
 export function createSocket(server, corsOrigins) {
   const io = new Server(server, {
-    cors: { origin: corsOrigins, credentials: true },
+    cors: { 
+      origin: corsOrigins,
+      credentials: true,
+      methods: ["GET", "POST"]  // ✅ Add this
+    },
     pingInterval: 10000,
     pingTimeout: 20000,
-    maxHttpBufferSize: 1e6
+    maxHttpBufferSize: 1e6,
+    transports: ['websocket', 'polling'],  // ✅ Add this
+    allowEIO3: true  // ✅ Add this for compatibility
   })
 
   // --- helper: decode JWT if provided ---

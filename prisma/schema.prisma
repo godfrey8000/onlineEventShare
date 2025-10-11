@@ -66,7 +66,7 @@ model MapFavorite {
 
 model Episode {
   id        Int         @id @default(autoincrement())
-  episodeId Int         @unique
+  episodeId  Int         @unique
   name      String
   maps      Map[]
   trackers  Tracker[]
@@ -77,7 +77,7 @@ model Episode {
 
 model Tracker {
   id         Int        @id @default(autoincrement())
-  episodeId  Int
+  episodeNumber  Int
   mapId      Int
   userId     Int?
   channelId  Int
@@ -88,7 +88,7 @@ model Tracker {
   updatedAt  DateTime   @updatedAt
 
   map       Map         @relation(fields: [mapId], references: [id])
-  episode   Episode     @relation(fields: [episodeId], references: [id])
+  episode   Episode     @relation(fields: [episodeNumber], references: [episodeId])
   user      User?       @relation(fields: [userId], references: [id])
 }
 

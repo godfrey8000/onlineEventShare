@@ -163,9 +163,10 @@ async function fetchTrackers() {
 }
 
 /* 🔑 Handle Login */
-async function handleLogin({ token: t, role: r, nickname: n }) {
+// App.vue - handleLogin function
+function handleLogin({ token: t, role: r, nickname: n }) {
   token.value = t
-  role.value = r
+  role.value = r  // ✅ Now passed from LoginBar
   nickname.value = n
   
   localStorage.setItem('token', t)
@@ -173,12 +174,10 @@ async function handleLogin({ token: t, role: r, nickname: n }) {
   localStorage.setItem('nickname', n)
   
   setAuthToken(t)
-  
-  // Reconnect socket with auth token
   disconnectSocket()
   connectSocket(t)
   
-  await fetchTrackers()
+  fetchTrackers()
 }
 
 /* 🚪 Handle Logout */
@@ -205,15 +204,22 @@ function handleProfileUpdate({ nickname: n }) {
 /* 🎯 Real-time event handlers */
 function handleTrackerCreated(tracker) {
   console.log('[App] Tracker created:', tracker)
-  trackers.value.push(tracker)
-  lastUpdate.value = Date.now()
+  // ✅ Check if already exists before adding
+  const exists = trackers.value.find(t => t.id === tracker.id)
+  if (!exists) {
+    trackers.value.push(tracker)
+  }
+  lastUpdate
+  .value = Date.now()
 }
-
 function handleTrackerUpdated(tracker) {
   console.log('[App] Tracker updated:', tracker)
   const index = trackers.value.findIndex(t => t.id === tracker.id)
   if (index !== -1) {
-    trackers.value[index] = tracker
+    // ✅ IMPORTANT: Replace the entire object to trigger reactivity
+    trackers.value[index] = { ...tracker }
+    // ✅ Force Vue to detect the change
+    trackers.value = [...trackers.value]
   }
   lastUpdate.value = Date.now()
 }
@@ -231,8 +237,14 @@ function handleTrackerAdded(newTracker) {
 }
 
 function handleTrackerUpdate(updatedTracker) {
-  // Update will be confirmed by socket event
   console.log('[App] User updated tracker:', updatedTracker)
+  // The socket event will handle the actual update
+  // This is just for optimistic UI update
+  const index = trackers.value.findIndex(t => t.id === updatedTracker.id)
+  if (index !== -1) {
+    trackers.value[index] = { ...updatedTracker }
+    trackers.value = [...trackers.value]
+  }
 }
 
 function handleTrackerDelete(trackerId) {

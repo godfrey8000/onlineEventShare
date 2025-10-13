@@ -211,6 +211,10 @@ export function onOnlineCount(handler) {
   socket?.on('users:onlineCount', handler)
 }
 
+export function onUserUpdated(handler) {
+  socket?.on('user:updated', handler)
+}
+
 // ✅ Remove event listeners
 export function offTrackerCreated(handler) {
   socket?.off('tracker:created:global', handler)
@@ -230,6 +234,10 @@ export function offChatMessage(handler) {
 
 export function offOnlineCount(handler) {
   socket?.off('users:onlineCount', handler)
+}
+
+export function offUserUpdated(handler) {
+  socket?.off('user:updated', handler)
 }
 
 // ✅ Register a callback to be called when socket is ready

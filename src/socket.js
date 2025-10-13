@@ -179,8 +179,9 @@ export function createSocket(server, corsOrigins) {
         
         if (!tracker) throw new Error('Tracker not found')
 
-        // Check permission (user can delete own, ADMIN can delete any)
-        if (tracker.userId !== socket.user.id && socket.user.role !== 'ADMIN') {
+        // Check permission (user can delete own, EDITOR/ADMIN can delete any)
+        const allowedRoles = ['EDITOR', 'ADMIN']
+        if (tracker.userId !== socket.user.id && !allowedRoles.includes(socket.user.role)) {
           throw new Error('Permission denied')
         }
 

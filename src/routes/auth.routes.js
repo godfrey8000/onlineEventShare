@@ -101,7 +101,19 @@ router.patch('/profile', verifyToken, async (req, res) => {
     const updated = await prisma.user.update({
       where: { id: req.user.id },
       data,
+      select: {
+        id: true,
+        username: true,
+        nickname: true,
+        role: true
+      }
     });
+
+    // ✅ Emit Socket.io event if nickname was updated
+    if (nickname && req.io) {
+      console.log('[REST API] Broadcasting user:updated event for user:', updated.id);
+      req.io.emit('user:updated', updated);
+    }
 
     res.json({ message: 'Profile updated', user: updated });
   } catch (err) {

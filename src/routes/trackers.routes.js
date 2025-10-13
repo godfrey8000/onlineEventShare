@@ -15,7 +15,18 @@ router.get('/trackers', authOptional, async (req, res) => {
 
     const trackers = await prisma.tracker.findMany({
       orderBy: { [sort]: asc ? 'asc' : 'desc' },
-      include: { episode: true, map: true },
+      include: {
+        episode: true,
+        map: true,
+        user: {
+          select: {
+            id: true,
+            username: true,
+            nickname: true,
+            role: true
+          }
+        }
+      },
     });
 
     res.json(trackers);
@@ -76,8 +87,8 @@ router.patch('/trackers/:id', authRequired, authorizeRole('EDITOR', 'ADMIN'), as
   }
 });
 
-// ✅ Restricted: Delete tracker (ADMIN only)
-router.delete('/trackers/:id', authRequired, authorizeRole('ADMIN'), async (req, res) => {
+// ✅ Restricted: Delete tracker (EDITOR, ADMIN)
+router.delete('/trackers/:id', authRequired, authorizeRole('EDITOR', 'ADMIN'), async (req, res) => {
   const id = Number(req.params.id);
   try {
     await prisma.tracker.delete({ where: { id } });

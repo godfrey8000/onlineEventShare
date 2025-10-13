@@ -98,6 +98,8 @@ import {
   offTrackerCreated,
   offTrackerUpdated,
   offTrackerDeleted,
+  onUserUpdated,
+  offUserUpdated,
   onSocketReady
 } from './services/socket'
 import LoginBar from './components/LoginBar.vue'
@@ -231,6 +233,22 @@ function handleTrackerDeleted({ id }) {
   lastUpdate.value = Date.now()
 }
 
+/* 👤 Handle user updates (e.g., nickname changes) */
+function handleUserUpdated(updatedUser) {
+  console.log('[App] User updated:', updatedUser)
+  // Update all trackers that belong to this user
+  trackers.value = trackers.value.map(tracker => {
+    if (tracker.userId === updatedUser.id) {
+      return {
+        ...tracker,
+        user: updatedUser
+      }
+    }
+    return tracker
+  })
+  lastUpdate.value = Date.now()
+}
+
 /* 📤 User action handlers */
 function handleTrackerAdded(newTracker) {
   // Optimistic update - will be confirmed by socket event
@@ -268,18 +286,20 @@ onMounted(() => {
 
   // ✅ Set up real-time listeners when socket is ready (runs on EVERY connect/reconnect)
   onSocketReady((socket) => {
-    console.log('[App] Socket ready, re-registering tracker event listeners for socket:', socket.id)
+    console.log('[App] Socket ready, re-registering event listeners for socket:', socket.id)
 
     // Remove old listeners first to avoid duplicates
     offTrackerCreated(handleTrackerCreated)
     offTrackerUpdated(handleTrackerUpdated)
     offTrackerDeleted(handleTrackerDeleted)
+    offUserUpdated(handleUserUpdated)
 
     // Add listeners to new socket
     onTrackerCreated(handleTrackerCreated)
     onTrackerUpdated(handleTrackerUpdated)
     onTrackerDeleted(handleTrackerDeleted)
-    console.log('[App] Tracker event listeners registered successfully')
+    onUserUpdated(handleUserUpdated)
+    console.log('[App] Event listeners registered successfully')
   })
 
   // Fetch initial data
@@ -288,10 +308,11 @@ onMounted(() => {
 
 /* 🧹 Cleanup on unmount */
 onBeforeUnmount(() => {
-  console.log('[App] Cleaning up tracker event listeners')
+  console.log('[App] Cleaning up event listeners')
   offTrackerCreated(handleTrackerCreated)
   offTrackerUpdated(handleTrackerUpdated)
   offTrackerDeleted(handleTrackerDeleted)
+  offUserUpdated(handleUserUpdated)
 })
 </script>
 

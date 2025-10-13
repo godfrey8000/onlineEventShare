@@ -116,7 +116,7 @@
         <!-- Box View -->
         <template v-if="viewMode === 'box'">
           <div class="tracker-header">
-            <div class="tracker-nickname">{{ tracker.nickname }}</div>
+            <div class="tracker-nickname">{{ getUserNickname(tracker) }}</div>
             <div class="tracker-meta">
               Lv{{ tracker.level }} - {{ getMapName(tracker.mapId) }}
             </div>
@@ -214,8 +214,8 @@
         <!-- Simple View -->
         <template v-else>
           <div class="simple-compact">
-            <span class="simple-nickname" :title="tracker.nickname">
-              {{ tracker.nickname || 'Unknown' }}
+            <span class="simple-nickname" :title="getUserNickname(tracker)">
+              {{ getUserNickname(tracker) }}
             </span>
             
             <span class="simple-map" :title="getMapName(tracker.mapId)">
@@ -302,7 +302,7 @@ const deleteMode = ref(false)
 
 // Permissions
 const canEdit = computed(() => ['EDITOR', 'ADMIN'].includes(props.role))
-const canDelete = computed(() => ['ADMIN'].includes(props.role))
+const canDelete = computed(() => ['EDITOR', 'ADMIN'].includes(props.role))
 
 // ✅ Load episodes and maps
 async function fetchData() {
@@ -359,12 +359,13 @@ const filteredTrackers = computed(() => {
     result = result.filter(t => selectedMaps.value.has(t.mapId))
   }
 
-  // Filter by nickname
+  // Filter by nickname (check both user.nickname and stored nickname)
   if (nicknameFilter.value) {
     const search = nicknameFilter.value.toLowerCase()
-    result = result.filter(t => 
-      t.nickname?.toLowerCase().includes(search)
-    )
+    result = result.filter(t => {
+      const displayName = (t.user?.nickname || t.nickname || '').toLowerCase()
+      return displayName.includes(search)
+    })
   }
 
   return result
@@ -422,6 +423,12 @@ const sortedTrackers = computed(() => {
 // ✅ Helper functions
 function getMapName(mapId) {
   return maps.value.find(m => m.id === mapId)?.name || 'Unknown'
+}
+
+// ✅ Get user's current nickname from user object, fallback to stored nickname
+function getUserNickname(tracker) {
+  // Prefer live user data over stored nickname
+  return tracker.user?.nickname || tracker.nickname || 'Unknown'
 }
 
 function getMapNameShort(mapId, length = 3) {
@@ -594,7 +601,7 @@ async function updateStatus(tracker) {
 }
 
 function confirmDelete(tracker) {
-  if (confirm(`Delete tracker for ${tracker.nickname}?`)) {
+  if (confirm(`Delete tracker for ${getUserNickname(tracker)}?`)) {
     deleteTracker(tracker)
   }
 }

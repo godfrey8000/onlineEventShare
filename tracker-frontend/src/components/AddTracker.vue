@@ -92,7 +92,7 @@
           <div class="section-label">📡 Channel</div>
           <div class="btn-group">
             <button
-              v-for="ch in 20"
+              v-for="ch in 10"
               :key="ch"
               :class="['btn channel-btn', { active: ch === channelId }]"
               @click="channelId = ch"

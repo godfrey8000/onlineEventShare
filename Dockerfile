@@ -7,12 +7,17 @@ WORKDIR /app/frontend
 
 # Copy frontend package files
 COPY tracker-frontend/package*.json ./
-RUN npm ci --only=production
+
+# Install ALL dependencies (including devDependencies like vite)
+RUN npm ci
 
 # Copy frontend source
 COPY tracker-frontend/ ./
 
 # Build frontend (creates dist folder)
+# Leave VITE_API_URL empty so it uses relative URLs in production
+ENV VITE_API_URL=""
+ENV VITE_SOCKET_URL=""
 RUN npm run build
 
 # Stage 2: Backend + Serve Frontend

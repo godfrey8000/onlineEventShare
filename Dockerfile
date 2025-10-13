@@ -38,6 +38,9 @@ RUN npx prisma generate
 # Copy backend source
 COPY src ./src
 
+# Copy seed files
+COPY prisma/seed.js ./prisma/seed.js
+
 # Copy built frontend from stage 1
 COPY --from=frontend-builder /app/frontend/dist ./public
 
@@ -48,5 +51,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
   CMD node -e "require('http').get('http://localhost:8080/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start application (runs migrations first)
-CMD ["sh", "-c", "npx prisma migrate deploy && node src/index.js"]
+# Start application (runs migrations and seed, then starts server)
+CMD ["sh", "-c", "npx prisma migrate deploy && node prisma/seed.js && node src/index.js"]

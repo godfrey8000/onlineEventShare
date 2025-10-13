@@ -34,7 +34,15 @@ router.post('/trackers', authRequired, authorizeRole('EDITOR', 'ADMIN'), async (
     const data = parsed.data;
     const tracker = await prisma.tracker.create({
       data: { ...data, userId: req.user.id },
+      include: { episode: true, map: true, user: true }
     });
+
+    // ✅ Emit Socket.io event for real-time updates
+    if (req.io) {
+      console.log('[REST API] Broadcasting tracker:created:global event:', tracker.id);
+      req.io.emit('tracker:created:global', tracker);
+    }
+
     res.json(tracker);
   } catch (err) {
     console.error('Error creating tracker:', err);
@@ -49,7 +57,18 @@ router.patch('/trackers/:id', authRequired, authorizeRole('EDITOR', 'ADMIN'), as
   if (!parsed.success) return res.status(400).json(parsed.error);
 
   try {
-    const tracker = await prisma.tracker.update({ where: { id }, data: parsed.data });
+    const tracker = await prisma.tracker.update({
+      where: { id },
+      data: parsed.data,
+      include: { episode: true, map: true, user: true }
+    });
+
+    // ✅ Emit Socket.io event for real-time updates
+    if (req.io) {
+      console.log('[REST API] Broadcasting tracker:changed:global event:', tracker.id);
+      req.io.emit('tracker:changed:global', tracker);
+    }
+
     res.json(tracker);
   } catch (err) {
     console.error('Error updating tracker:', err);
@@ -62,6 +81,13 @@ router.delete('/trackers/:id', authRequired, authorizeRole('ADMIN'), async (req,
   const id = Number(req.params.id);
   try {
     await prisma.tracker.delete({ where: { id } });
+
+    // ✅ Emit Socket.io event for real-time updates
+    if (req.io) {
+      console.log('[REST API] Broadcasting tracker:deleted:global event:', id);
+      req.io.emit('tracker:deleted:global', { id });
+    }
+
     res.json({ ok: true });
   } catch (err) {
     console.error('Error deleting tracker:', err);

@@ -88,8 +88,8 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { api, setAuthToken, initAuth } from './services/api'
-import { 
-  connectSocket, 
+import {
+  connectSocket,
   disconnectSocket,
   getConnectionStatus,
   onTrackerCreated,
@@ -97,7 +97,8 @@ import {
   onTrackerDeleted,
   offTrackerCreated,
   offTrackerUpdated,
-  offTrackerDeleted
+  offTrackerDeleted,
+  onSocketReady
 } from './services/socket'
 import LoginBar from './components/LoginBar.vue'
 import TrackerBoard from './components/TrackerBoard.vue'
@@ -261,21 +262,33 @@ onMounted(() => {
     nickname.value = localStorage.getItem('nickname') || ''
     role.value = localStorage.getItem('role') || 'VIEWER'
   }
-  
+
   // Connect socket (with or without token)
   connectSocket(savedToken)
-  
-  // Set up real-time listeners
-  onTrackerCreated(handleTrackerCreated)
-  onTrackerUpdated(handleTrackerUpdated)
-  onTrackerDeleted(handleTrackerDeleted)
-  
+
+  // ✅ Set up real-time listeners when socket is ready (runs on EVERY connect/reconnect)
+  onSocketReady((socket) => {
+    console.log('[App] Socket ready, re-registering tracker event listeners for socket:', socket.id)
+
+    // Remove old listeners first to avoid duplicates
+    offTrackerCreated(handleTrackerCreated)
+    offTrackerUpdated(handleTrackerUpdated)
+    offTrackerDeleted(handleTrackerDeleted)
+
+    // Add listeners to new socket
+    onTrackerCreated(handleTrackerCreated)
+    onTrackerUpdated(handleTrackerUpdated)
+    onTrackerDeleted(handleTrackerDeleted)
+    console.log('[App] Tracker event listeners registered successfully')
+  })
+
   // Fetch initial data
   fetchTrackers()
 })
 
 /* 🧹 Cleanup on unmount */
 onBeforeUnmount(() => {
+  console.log('[App] Cleaning up tracker event listeners')
   offTrackerCreated(handleTrackerCreated)
   offTrackerUpdated(handleTrackerUpdated)
   offTrackerDeleted(handleTrackerDeleted)

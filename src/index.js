@@ -42,6 +42,16 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static('public'));
 
+// Create HTTP server and Socket.io
+const server = http.createServer(app);
+const io = createSocket(server, CORS_ORIGIN);
+
+// ✅ Make io available to routes via middleware
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 // ✅ Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', episodesRoutes);
@@ -62,10 +72,6 @@ app.use((err, req, res, next) => {
   console.error('Server error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
-
-// Create HTTP server and Socket.io
-const server = http.createServer(app);
-const io = createSocket(server, CORS_ORIGIN);
 
 // Start server
 server.listen(PORT, () => {

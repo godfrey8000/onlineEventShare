@@ -35,7 +35,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
-import { getSocket, loadChatHistory, sendChatMessage, onChatMessage, offChatMessage } from '../services/socket';
+import { getSocket, loadChatHistory, sendChatMessage, onChatMessage, offChatMessage, onSocketReady } from '../services/socket';
 
 const props = defineProps({ token: String, role: String });
 
@@ -46,6 +46,12 @@ const canChat = ['CHATTER', 'EDITOR', 'ADMIN'].includes(props.role);
 const visible = ref(false);
 
 let socket = null;
+
+// ✅ Handler for new chat messages
+const handleNewMessage = (msg) => {
+  messages.value.push(msg);
+  nextTick(scrollToBottom);
+};
 
 onMounted(async () => {
   // ✅ Get existing socket connection (don't create a new one!)
@@ -61,29 +67,34 @@ onMounted(async () => {
   socket.on('connect', () => (connected.value = true));
   socket.on('disconnect', () => (connected.value = false));
 
-  // ✅ Load chat history via Socket.IO
-  loadChatHistory({ limit: 100 }, (response) => {
-    if (response?.ok) {
-      messages.value = response.messages || [];
-      console.log('[ChatRoom] Loaded', messages.value.length, 'messages');
-      nextTick(scrollToBottom);
-    } else {
-      console.error('[ChatRoom] Failed to load history:', response?.error);
-    }
-  });
+  // ✅ Set up chat listeners when socket is ready (runs on EVERY connect/reconnect)
+  onSocketReady((socket) => {
+    console.log('[ChatRoom] Socket ready, re-registering chat event listener for socket:', socket.id);
 
-  // ✅ Listen for new chat messages
-  const handleNewMessage = (msg) => {
-    messages.value.push(msg);
-    nextTick(scrollToBottom);
-  };
+    // Load chat history
+    loadChatHistory({ limit: 100 }, (response) => {
+      if (response?.ok) {
+        messages.value = response.messages || [];
+        console.log('[ChatRoom] Loaded', messages.value.length, 'messages');
+        nextTick(scrollToBottom);
+      } else {
+        console.error('[ChatRoom] Failed to load history:', response?.error);
+      }
+    });
 
-  onChatMessage(handleNewMessage);
-
-  // ✅ Cleanup on unmount
-  onUnmounted(() => {
+    // Remove old listener first to avoid duplicates
     offChatMessage(handleNewMessage);
+
+    // Listen for new messages
+    onChatMessage(handleNewMessage);
+    console.log('[ChatRoom] Chat event listener registered successfully');
   });
+});
+
+// ✅ Cleanup on unmount
+onUnmounted(() => {
+  console.log('[ChatRoom] Cleaning up chat event listener');
+  offChatMessage(handleNewMessage);
 });
 
 function scrollToBottom() {

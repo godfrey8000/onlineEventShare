@@ -55,7 +55,12 @@ export function useOnlineUsers() {
     // ✅ Set up event listeners when socket is ready (runs on EVERY connect/reconnect)
     onSocketReady((socket) => {
       console.log('[useOnlineUsers] Socket ready event fired for socket:', socket.id)
-      console.log('[useOnlineUsers] Setting up event listener')
+
+      // Remove old listener first to avoid duplicates
+      offOnlineCount(handleOnlineCount)
+
+      // Add listener to new socket
+      console.log('[useOnlineUsers] Registering online count event listener')
       onOnlineCount(handleOnlineCount)
       console.log('[useOnlineUsers] Event listener registered successfully')
     })

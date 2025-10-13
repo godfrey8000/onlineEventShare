@@ -12,12 +12,8 @@ const lastConnectedAt = ref(null)
 const lastDisconnectedAt = ref(null)
 const disconnectedFor = ref(null)
 
-// ✅ Flag to ensure we only set up listeners once
-let listenersRegistered = false
-
 export function useOnlineUsers() {
   let statusInterval
-  let handleOnlineCount
 
   onMounted(() => {
     console.log('[useOnlineUsers] Composable mounted')
@@ -44,7 +40,7 @@ export function useOnlineUsers() {
     updateStatus() // Initial update
 
     // ✅ Listen for online count updates
-    handleOnlineCount = (data) => {
+    const handleOnlineCount = (data) => {
       console.log('[useOnlineUsers] Received users:onlineCount event:', data)
       onlineCount.value = data.total
       visitorCount.value = data.visitors
@@ -56,26 +52,19 @@ export function useOnlineUsers() {
       })
     }
 
-    // ✅ Set up event listeners when socket is ready
+    // ✅ Set up event listeners when socket is ready (runs on EVERY connect/reconnect)
     onSocketReady((socket) => {
-      if (listenersRegistered) {
-        console.log('[useOnlineUsers] Listeners already registered, skipping')
-        return
-      }
-
-      console.log('[useOnlineUsers] Socket is ready, setting up event listener')
+      console.log('[useOnlineUsers] Socket ready event fired for socket:', socket.id)
+      console.log('[useOnlineUsers] Setting up event listener')
       onOnlineCount(handleOnlineCount)
-      listenersRegistered = true
       console.log('[useOnlineUsers] Event listener registered successfully')
     })
 
     // ✅ Cleanup function
     onUnmounted(() => {
+      console.log('[useOnlineUsers] Composable unmounted, cleaning up')
       clearInterval(statusInterval)
-      if (listenersRegistered && handleOnlineCount) {
-        offOnlineCount(handleOnlineCount)
-        listenersRegistered = false
-      }
+      offOnlineCount(handleOnlineCount)
     })
   })
 

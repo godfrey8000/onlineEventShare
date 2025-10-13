@@ -8,7 +8,7 @@ let lastConnectedAt = null
 let lastDisconnectedAt = null
 
 // ✅ Callbacks to notify when socket is ready
-const socketReadyCallbacks = []
+let socketReadyCallbacks = []
 
 // ✅ Connect to socket with token
 export function connectSocket(token = '') {
@@ -67,6 +67,9 @@ export function connectSocket(token = '') {
     reconnectAttempts = 0
     lastConnectedAt = new Date()
     lastDisconnectedAt = null
+
+    // ✅ Notify callbacks on reconnect too
+    socketReadyCallbacks.forEach(callback => callback(socket))
   })
 
   socket.on('reconnect_failed', () => {

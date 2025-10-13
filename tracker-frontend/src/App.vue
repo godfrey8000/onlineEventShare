@@ -41,7 +41,7 @@
     />
 
     <!-- 💬 Chat Room (if user has permission) -->
-    <ChatRoom v-if="token && canChat" />
+    <ChatRoom v-if="token && canChat" :token="token" :role="role" />
 
     <!-- 👥 Online User Count -->
     <button class="connected-btn" @click="showUsers = !showUsers">

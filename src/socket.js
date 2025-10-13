@@ -6,18 +6,22 @@ import { JWT_SECRET } from './config.js'
 const onlineUsers = new Map() // socket.id → { id, username, nickname, role }
 
 export function createSocket(server, corsOrigins) {
+  console.log('[Socket.io] Creating server with CORS origins:', corsOrigins)
+
   const io = new Server(server, {
-    cors: { 
+    cors: {
       origin: corsOrigins,
       credentials: true,
-      methods: ["GET", "POST"]  // ✅ Add this
+      methods: ["GET", "POST"]
     },
     pingInterval: 10000,
     pingTimeout: 20000,
     maxHttpBufferSize: 1e6,
-    transports: ['websocket', 'polling'],  // ✅ Add this
-    allowEIO3: true  // ✅ Add this for compatibility
+    transports: ['websocket', 'polling'],
+    allowEIO3: true
   })
+
+  console.log('[Socket.io] Server created successfully')
 
   // --- helper: decode JWT if provided ---
   function decodeToken(token) {
@@ -36,7 +40,17 @@ export function createSocket(server, corsOrigins) {
   // --- middleware for auth ---
   io.use((socket, next) => {
     const { token } = socket.handshake.auth || {}
-    if (token) socket.user = decodeToken(token)
+    console.log('[Socket.io] Auth middleware - token received:', token ? 'Yes (' + token.substring(0, 20) + '...)' : 'No')
+
+    if (token) {
+      const decoded = decodeToken(token)
+      if (decoded) {
+        socket.user = decoded
+        console.log('[Socket.io] Token decoded successfully:', { id: decoded.id, username: decoded.username, nickname: decoded.nickname, role: decoded.role })
+      } else {
+        console.log('[Socket.io] Token decode failed')
+      }
+    }
     next()
   })
 
@@ -50,9 +64,11 @@ export function createSocket(server, corsOrigins) {
     } : null
 
     onlineUsers.set(socket.id, userInfo)
-    emitOnlineCounts(io)
 
     console.log(`[Socket] ${userInfo?.nickname || 'Visitor'} connected (${socket.id})`)
+    console.log(`[Socket] Total online users: ${onlineUsers.size}`, Array.from(onlineUsers.values()))
+
+    emitOnlineCounts(io)
 
     // --- handle disconnect ---
     socket.on('disconnect', () => {
@@ -269,7 +285,7 @@ function emitOnlineCounts(io) {
   const namedUsers = allUsers.filter(u => u !== null)
   const visitors = allUsers.filter(u => u === null)
 
-  io.emit('users:onlineCount', {
+  const payload = {
     total: allUsers.length,
     visitors: visitors.length,
     namedUsers: namedUsers,  // ✅ Array of user objects with id, username, nickname, role
@@ -277,5 +293,8 @@ function emitOnlineCounts(io) {
       users: namedUsers.length,
       visitors: visitors.length
     }
-  })
+  }
+
+  console.log('[Socket] Emitting users:onlineCount:', payload)
+  io.emit('users:onlineCount', payload)
 }

@@ -7,6 +7,9 @@ let reconnectAttempts = 0
 let lastConnectedAt = null
 let lastDisconnectedAt = null
 
+// ✅ Callbacks to notify when socket is ready
+const socketReadyCallbacks = []
+
 // ✅ Connect to socket with token
 export function connectSocket(token = '') {
   if (socket?.connected) {
@@ -20,6 +23,7 @@ export function connectSocket(token = '') {
   }
 
   console.log('[Socket] Connecting to:', SOCKET_URL)
+  console.log('[Socket] Token provided:', token ? 'Yes (' + token.substring(0, 20) + '...)' : 'No')
 
   socket = io(SOCKET_URL, {
     transports: ['websocket', 'polling'],  // ✅ Fallback to polling if websocket fails
@@ -30,12 +34,17 @@ export function connectSocket(token = '') {
     timeout: 20000,
   })
 
+  console.log('[Socket] Socket created with auth:', socket.auth)
+
   // ✅ Connection events
   socket.on('connect', () => {
     console.log('[Socket] Connected!', socket.id)
     reconnectAttempts = 0
     lastConnectedAt = new Date()
     lastDisconnectedAt = null
+
+    // ✅ Notify all waiting callbacks that socket is ready
+    socketReadyCallbacks.forEach(callback => callback(socket))
   })
 
   socket.on('disconnect', (reason) => {
@@ -218,6 +227,17 @@ export function offChatMessage(handler) {
 
 export function offOnlineCount(handler) {
   socket?.off('users:onlineCount', handler)
+}
+
+// ✅ Register a callback to be called when socket is ready
+export function onSocketReady(callback) {
+  // If socket already exists and is connected, call immediately
+  if (socket?.connected) {
+    callback(socket)
+    return
+  }
+  // Otherwise, add to queue
+  socketReadyCallbacks.push(callback)
 }
 
 export default {

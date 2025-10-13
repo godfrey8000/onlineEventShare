@@ -34,9 +34,8 @@
 
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
-import { API } from '../services/api';
-import { connectSocket } from '../services/socket';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { getSocket, loadChatHistory, sendChatMessage, onChatMessage, offChatMessage } from '../services/socket';
 
 const props = defineProps({ token: String, role: String });
 
@@ -46,32 +45,66 @@ const connected = ref(false);
 const canChat = ['CHATTER', 'EDITOR', 'ADMIN'].includes(props.role);
 const visible = ref(false);
 
-
 let socket = null;
 
 onMounted(async () => {
-  try {
-    const res = await API.get('/chat/history');
-    messages.value = res.data || [];
-  } catch (e) {
-    console.error('Chat history error:', e);
+  // ✅ Get existing socket connection (don't create a new one!)
+  socket = getSocket();
+
+  if (!socket) {
+    console.error('[ChatRoom] Socket not initialized');
+    return;
   }
 
-  socket = connectSocket(props.token);
+  // ✅ Update connection status
+  connected.value = socket.connected;
   socket.on('connect', () => (connected.value = true));
   socket.on('disconnect', () => (connected.value = false));
-  socket.on('chat:new', (msg) => {
+
+  // ✅ Load chat history via Socket.IO
+  loadChatHistory({ limit: 100 }, (response) => {
+    if (response?.ok) {
+      messages.value = response.messages || [];
+      console.log('[ChatRoom] Loaded', messages.value.length, 'messages');
+      nextTick(scrollToBottom);
+    } else {
+      console.error('[ChatRoom] Failed to load history:', response?.error);
+    }
+  });
+
+  // ✅ Listen for new chat messages
+  const handleNewMessage = (msg) => {
     messages.value.push(msg);
-    nextTick(() => {
-      const box = document.querySelector('.chat-body');
-      box.scrollTop = box.scrollHeight;
-    });
+    nextTick(scrollToBottom);
+  };
+
+  onChatMessage(handleNewMessage);
+
+  // ✅ Cleanup on unmount
+  onUnmounted(() => {
+    offChatMessage(handleNewMessage);
   });
 });
 
+function scrollToBottom() {
+  const box = document.querySelector('.chat-body');
+  if (box) {
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
 function send() {
-  if (!text.value.trim()) return;
-  socket.emit('chat:send', { content: text.value.trim() });
+  if (!text.value.trim() || !canChat) return;
+
+  sendChatMessage(text.value.trim(), (response) => {
+    if (response?.error) {
+      console.error('[ChatRoom] Failed to send:', response.error);
+      alert('Failed to send message: ' + response.error);
+    } else {
+      console.log('[ChatRoom] Message sent');
+    }
+  });
+
   text.value = '';
 }
 </script>

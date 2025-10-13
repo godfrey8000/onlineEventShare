@@ -40,6 +40,8 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Serve static frontend files in production
 app.use(express.static('public'));
 
 // Create HTTP server and Socket.io
@@ -62,7 +64,17 @@ app.use('/api', chatRoutes);  // ✅ Add chat routes
 // Health check
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-// ✅ 404 handler
+// ✅ SPA fallback - serve index.html for non-API routes
+app.get('*', (req, res, next) => {
+  // If it's an API route, let it 404
+  if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+    return next();
+  }
+  // Otherwise serve the frontend
+  res.sendFile('index.html', { root: 'public' });
+});
+
+// ✅ 404 handler for API routes
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });

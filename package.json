@@ -5,7 +5,15 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "prisma:dev": "prisma migrate dev --name init"
+    "prisma:dev": "prisma migrate dev --name init",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:generate": "prisma generate",
+    "build": "cd tracker-frontend && npm install && npm run build",
+    "deploy:check": "bash scripts/deploy-check.sh",
+    "deploy:local": "bash scripts/local-deploy.sh",
+    "generate:secret": "node scripts/generate-secret.js",
+    "docker:build": "docker build -t tosmtracker .",
+    "docker:run": "docker run -p 8080:8080 --env-file .env tosmtracker"
   },
   "dependencies": {
     "@prisma/client": "^6.17.0",

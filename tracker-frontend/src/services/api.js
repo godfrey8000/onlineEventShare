@@ -1,8 +1,9 @@
 import axios from 'axios'
 
-// ✅ Backend runs on port 8080
-export const API_BASE =
-  import.meta.env.VITE_API_BASE || 'http://localhost:8080/api'
+// ✅ Use environment variable or fallback to relative URL in production
+export const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api'  // Relative URL for production (same server)
 
 export const API = axios.create({
   baseURL: API_BASE,

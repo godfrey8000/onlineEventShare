@@ -4,21 +4,21 @@
     <!-- Filters (Collapsible) -->
     <div class="controls filter-controls">
       <div class="filter-header" @click="filtersExpanded = !filtersExpanded">
-        <span>🔍 Filters</span>
+        <span>🔍 {{ t('tracker.filters') }}</span>
         <span class="toggle-icon">{{ filtersExpanded ? '▼' : '▶' }}</span>
       </div>
 
       <!-- Active Filter Summary -->
       <div v-if="filterSummaryText" class="filter-summary">
         🗺️ Filtering: {{ filterSummaryText }}
-        <button @click="clearAllFilters" class="clear-filter-btn">✕ Clear</button>
+        <button @click="clearAllFilters" class="clear-filter-btn">✕ {{ t('tracker.clear') }}</button>
       </div>
 
       <div v-if="filtersExpanded" class="filter-section">
         <!-- Episode Filter -->
         <div class="filter-group">
           <label @click="episodeFilterExpanded = !episodeFilterExpanded" class="filter-label-toggle">
-            📺 Episodes:
+            📺 {{ t('tracker.episodes') }}:
             <span class="toggle-icon">{{ episodeFilterExpanded ? '▼' : '▶' }}</span>
           </label>
           <div v-if="episodeFilterExpanded" class="button-group">
@@ -35,7 +35,7 @@
               class="clear-btn"
               @click="selectedEpisodes.clear()"
             >
-              Clear
+              {{ t('tracker.clear') }}
             </button>
           </div>
         </div>
@@ -43,7 +43,7 @@
         <!-- Map Filter (only show when episodes are selected) -->
         <div v-if="selectedEpisodes.size > 0" class="filter-group">
           <label @click="mapFilterExpanded = !mapFilterExpanded" class="filter-label-toggle">
-            🗺️ Maps:
+            🗺️ {{ t('tracker.maps') }}:
             <span class="toggle-icon">{{ mapFilterExpanded ? '▼' : '▶' }}</span>
           </label>
           <div v-if="mapFilterExpanded" class="button-group">
@@ -60,14 +60,14 @@
               class="clear-btn"
               @click="selectedMaps.clear()"
             >
-              Clear
+              {{ t('tracker.clear') }}
             </button>
           </div>
         </div>
 
         <!-- Nickname Filter -->
         <div class="filter-group">
-          <label>👤 Nickname:</label>
+          <label>👤 {{ t('tracker.nickname') }}:</label>
           <input
             v-model="nicknameFilter"
             type="text"
@@ -86,13 +86,13 @@
           :class="{ active: viewMode === 'box' }"
           @click="viewMode = 'box'"
         >
-          📦 Box View
+          📦 {{ t('tracker.boxView') }}
         </button>
         <button
           :class="{ active: viewMode === 'simple' }"
           @click="viewMode = 'simple'"
         >
-          📋 Simple View
+          📋 {{ t('tracker.simpleView') }}
         </button>
       </div>
 
@@ -102,13 +102,13 @@
           :class="{ active: deleteMode }"
           @click="deleteMode = !deleteMode"
         >
-          {{ deleteMode ? '✓ Done' : '🗑️ Delete Mode' }}
+          {{ deleteMode ? '✓ Done' : '🗑️ ' + t('tracker.deleteMode') }}
         </button>
       </div>
 
       <!-- Sorting -->
       <div class="sort-section">
-        <label>🔀 Sort by:</label>
+        <label>🔀 {{ t('tracker.sortBy') }}</label>
         <select v-model="sortBy" class="sort-select">
           <option value="status">Status</option>
           <option value="level">Level</option>
@@ -123,7 +123,7 @@
 
       <!-- Quick Add Tracker -->
       <div v-if="canEdit" class="quick-add-section">
-        <label>⚡ Quick Add:</label>
+        <label>⚡ {{ t('tracker.quickAdd') }}</label>
         <input
           v-model="quickAddInput"
           type="text"
@@ -133,14 +133,14 @@
           :title="'Format: [Level][Channel][Status]\nLv1-9: 721.5 (Lv7, Ch2, 1.5)\nLv10-99: 6621.7 (Lv66, Ch2, 1.7)\nLv100+: 10523 (Lv105, Ch2, 3)'"
         />
         <button @click="handleQuickAdd" class="quick-add-btn" :disabled="!quickAddInput">
-          Add
+          {{ t('tracker.add') }}
         </button>
       </div>
     </div>
 
     <!-- Tracker Count -->
     <div class="tracker-info">
-      Showing {{ filteredTrackers.length }} of {{ validTrackers.length }} trackers
+      {{ t('tracker.showingTrackers', { count: filteredTrackers.length, total: validTrackers.length }) }}
     </div>
 
     <!-- Trackers Display -->
@@ -310,8 +310,8 @@
 
       <!-- Empty State -->
       <div v-if="sortedTrackers.length === 0" class="empty-state">
-        <p v-if="trackers.length === 0">No trackers yet. Add one to get started!</p>
-        <p v-else>No trackers match the current filters.</p>
+        <p v-if="trackers.length === 0">{{ t('tracker.noTrackers') }}</p>
+        <p v-else>{{ t('tracker.noTrackers') }}</p>
       </div>
     </div>
   </div>
@@ -319,7 +319,10 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from '../services/api'
+
+const { t } = useI18n()
 
 const props = defineProps({
   trackers: {

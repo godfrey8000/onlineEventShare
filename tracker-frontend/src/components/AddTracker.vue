@@ -1,20 +1,20 @@
 <template>
   <div class="add-tracker">
     <button class="toggle-btn" @click="toggle">
-      {{ open ? '✕ Hide Form' : '➕ Add Tracker' }}
+      {{ open ? '✕ ' + t('tracker.hide') : '➕ ' + t('tracker.addTracker') }}
     </button>
 
     <transition name="slide-down">
       <div v-if="open" class="form">
         <!-- Loading state -->
-        <div v-if="loading" class="loading">Loading...</div>
+        <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
         
         <!-- Error message -->
         <div v-if="error" class="error-banner">{{ error }}</div>
 
         <!-- Episodes -->
         <div class="section">
-          <div class="section-label">📺 Episode</div>
+          <div class="section-label">📺 {{ t('tracker.episode') }}</div>
           <div class="btn-group">
             <button
               v-for="e in episodes"
@@ -30,7 +30,7 @@
         <!-- Maps -->
         <div class="section">
           <div class="section-label">
-            🗺️ Map
+            🗺️ {{ t('tracker.map') }}
             <span v-if="selectedEpisodes.size > 0 && filteredMaps.length > 0" class="count">
               ({{ filteredMaps.length }})
             </span>
@@ -38,7 +38,7 @@
 
           <!-- Favorites (always shown) -->
           <div v-if="favoriteMaps.length > 0" class="map-section">
-            <div class="subsection-label">⭐ Favorites</div>
+            <div class="subsection-label">⭐ {{ t('tracker.favorites') }}</div>
             <div class="btn-group">
               <button
                 v-for="m in favoriteMaps"
@@ -59,7 +59,7 @@
           <div v-if="selectedEpisodes.size > 0" class="map-section">
             <div v-if="filteredMaps.length > 0">
               <div class="subsection-label">
-                {{ favoriteMaps.length > 0 ? 'Other Maps' : 'All Maps' }}
+                {{ favoriteMaps.length > 0 ? t('tracker.otherMaps') : t('tracker.allMaps') }}
               </div>
               <div class="btn-group">
                 <button
@@ -82,19 +82,19 @@
               </div>
             </div>
             <div v-else class="empty-state">
-              No maps found for selected episodes
+              {{ t('tracker.noMapsFound') }}
             </div>
           </div>
 
           <!-- Show hint when no episode selected and no favorites -->
           <div v-if="selectedEpisodes.size === 0 && favoriteMaps.length === 0" class="empty-state">
-            Select an episode to see maps
+            {{ t('tracker.selectEpisode') }}
           </div>
         </div>
 
         <!-- Channels -->
         <div class="section">
-          <div class="section-label">📡 Channel</div>
+          <div class="section-label">📡 {{ t('tracker.channel') }}</div>
           <div class="btn-group">
             <button
               v-for="ch in 10"
@@ -109,7 +109,7 @@
 
         <!-- Status -->
         <div class="section">
-          <div class="section-label">📊 Progress Status</div>
+          <div class="section-label">📊 {{ t('tracker.progressStatus') }}</div>
           <div class="btn-group">
             <button
               v-for="s in statuses"
@@ -123,14 +123,14 @@
           
           <!-- Manual input -->
           <div class="manual-input">
-            <label>Or enter custom (0-5):</label>
+            <label>{{ t('tracker.manualInput') }}</label>
             <input
               v-model="manualStatus"
               type="number"
               min="0"
               max="5"
               step="0.1"
-              placeholder="e.g. 2.5"
+              :placeholder="t('tracker.manualPlaceholder')"
               @input="onManualInput"
             />
           </div>
@@ -138,7 +138,7 @@
 
         <!-- Selected map info -->
         <div v-if="selectedMap" class="selected-info">
-          <strong>Selected:</strong> 
+          <strong>{{ t('tracker.selected') }}</strong> 
           EP{{ selectedMap.episodeNumber }} - 
           Lv{{ selectedMap.level }} {{ selectedMap.name }} - 
           Ch{{ channelId }} - 
@@ -147,15 +147,15 @@
 
         <!-- Actions -->
         <div class="actions">
-          <button 
-            class="add-btn" 
+          <button
+            class="add-btn"
             @click="add"
             :disabled="!canAdd || submitting"
           >
-            {{ submitting ? 'Adding...' : '✓ Add Tracker' }}
+            {{ submitting ? t('tracker.adding') : '✓ ' + t('tracker.add') }}
           </button>
           <button class="clear-btn" @click="clear">
-            ✕ Clear
+            ✕ {{ t('tracker.clear') }}
           </button>
         </div>
       </div>
@@ -165,7 +165,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from '../services/api'
+
+const { t } = useI18n()
 
 const props = defineProps({
   nickname: String
@@ -265,7 +268,7 @@ async function fetchData() {
     })
   } catch (err) {
     console.error('Failed to load data:', err)
-    error.value = 'Failed to load episodes and maps'
+    error.value = t('tracker.failedToLoad')
   } finally {
     loading.value = false
   }
@@ -333,7 +336,7 @@ async function add() {
   
   const map = selectedMap.value
   if (!map) {
-    error.value = 'Please select a map'
+    error.value = t('tracker.selectMap')
     return
   }
   

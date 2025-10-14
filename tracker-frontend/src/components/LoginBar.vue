@@ -1,31 +1,31 @@
 <template>
   <header class="bar">
     <div class="bar-left">
-      <strong>Tracker Board</strong>
+      <strong>{{ t('tracker.title') }}</strong>
       <span v-if="token" class="status-badge online">
         🟢 {{ nickname }}
         <span class="role-badge">{{ role }}</span>
       </span>
-      <span v-else class="status-badge offline">🔒 Viewer</span>
+      <span v-else class="status-badge offline">🔒 {{ t('common.viewer') }}</span>
     </div>
 
     <div class="bar-right">
       <template v-if="!token">
-        <input 
-          v-model="username" 
-          placeholder="username" 
+        <input
+          v-model="username"
+          :placeholder="t('auth.username')"
           @keyup.enter="login"
           :disabled="loading"
         />
-        <input 
-          v-model="password" 
-          type="password" 
-          placeholder="password"
+        <input
+          v-model="password"
+          type="password"
+          :placeholder="t('auth.password')"
           @keyup.enter="login"
           :disabled="loading"
         />
         <button @click="login" :disabled="loading">
-          {{ loading ? 'Logging in...' : 'Login' }}
+          {{ loading ? t('auth.loggingIn') : t('auth.login') }}
         </button>
         <span v-if="error" class="error-msg">{{ error }}</span>
       </template>
@@ -40,10 +40,10 @@
       <!-- Logged in actions -->
       <template v-if="token">
         <button @click="$emit('openProfile')" class="profile-btn">
-          👤 Profile
+          👤 {{ t('auth.profile') }}
         </button>
         <button @click="handleLogout" class="logout-btn">
-          Logout
+          {{ t('auth.logout') }}
         </button>
       </template>
     </div>
@@ -52,7 +52,10 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from '../services/api'
+
+const { t } = useI18n()
 
 const props = defineProps({
   token: String,
@@ -69,12 +72,12 @@ const loading = ref(false)
 const error = ref('')
 
 // Language state
-const currentLocale = ref(localStorage.getItem('locale') || 'en')
+const currentLocale = ref(localStorage.getItem('locale') || 'zh')  // Default to Traditional Chinese
 
 // ✅ Login function with proper error handling
 async function login() {
   if (!username.value || !password.value) {
-    error.value = 'Please enter username and password'
+    error.value = t('auth.enterCredentials')
     return
   }
 
@@ -97,7 +100,7 @@ async function login() {
     // Decode JWT to get user info
     try {
       const payload = JSON.parse(atob(token.split('.')[1]))
-      
+
       emit('login', {
         token,
         nickname: payload.nickname || payload.username,
@@ -118,7 +121,7 @@ async function login() {
     }
   } catch (err) {
     console.error('Login failed:', err)
-    error.value = err.response?.data?.error || 'Login failed. Please try again.'
+    error.value = err.response?.data?.error || t('auth.loginFailed')
   } finally {
     loading.value = false
   }
@@ -126,7 +129,7 @@ async function login() {
 
 // ✅ Logout with confirmation
 function handleLogout() {
-  if (confirm('Are you sure you want to logout?')) {
+  if (confirm(t('auth.logoutConfirm'))) {
     emit('logout')
   }
 }
@@ -136,14 +139,12 @@ function changeLanguage(event) {
   const locale = event.target.value
   localStorage.setItem('locale', locale)
   currentLocale.value = locale
-  
-  // If you have i18n setup, update it
-  // if (window.$i18n) {
-  //   window.$i18n.locale = locale
-  // }
-  
-  console.log('Language changed to:', locale)
-  // TODO: Implement actual i18n switching when ready
+
+  // Update i18n locale globally
+  import('../i18n/index.js').then(({ i18n }) => {
+    i18n.global.locale.value = locale
+    console.log('Language changed to:', locale)
+  })
 }
 </script>
 

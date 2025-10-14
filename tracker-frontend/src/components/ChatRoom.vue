@@ -123,7 +123,7 @@ function send() {
 <style scoped>
 .chat-room {
   position: fixed;
-  bottom: 80px; /* keep above update timestamp */
+  bottom: 180px;
   right: 20px;
   width: 320px;
   height: 420px;
@@ -193,17 +193,27 @@ function send() {
 }
 .chat-toggle {
   position: fixed;
-  bottom: 20px;
+  bottom: 100px;
   right: 20px;
   background: #3b82f6;
   color: white;
   border: none;
   border-radius: 50%;
-  width: 48px;
-  height: 48px;
-  font-size: 20px;
+  width: 64px;
+  height: 64px;
+  font-size: 28px;
   cursor: pointer;
   z-index: 1001;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-toggle:hover {
+  background: #2563eb;
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.6);
 }
 </style>

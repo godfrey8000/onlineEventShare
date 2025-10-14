@@ -33,6 +33,7 @@
     />
     
     <TrackerBoard
+      :nickname="nickname"
       :trackers="trackers"
       :token="token"
       :role="role"
@@ -336,7 +337,7 @@ onBeforeUnmount(() => {
 
 .connected-btn {
   position: fixed;
-  bottom: 80px;
+  bottom: 20px;
   right: 20px;
   padding: 10px 16px;
   border: none;
@@ -347,6 +348,7 @@ onBeforeUnmount(() => {
   font-size: 14px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   transition: background 0.2s;
+  z-index: 999;
 }
 
 .connected-btn:hover {
@@ -413,13 +415,14 @@ onBeforeUnmount(() => {
 
 .connection-status {
   position: fixed;
-  right: 20px;
+  left: 20px;
   bottom: 20px;
   font-size: 12px;
   background: #1a1a1a;
   padding: 8px 12px;
   border-radius: 6px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 100;
 }
 
 .status-line {

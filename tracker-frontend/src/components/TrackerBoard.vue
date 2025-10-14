@@ -1,12 +1,27 @@
 <template>
   <div class="tracker-board">
-    <!-- Filters & Controls -->
-    <div class="controls">
-      <div class="filter-section">
+
+    <!-- Filters (Collapsible) -->
+    <div class="controls filter-controls">
+      <div class="filter-header" @click="filtersExpanded = !filtersExpanded">
+        <span>🔍 Filters</span>
+        <span class="toggle-icon">{{ filtersExpanded ? '▼' : '▶' }}</span>
+      </div>
+
+      <!-- Active Filter Summary -->
+      <div v-if="filterSummaryText" class="filter-summary">
+        🗺️ Filtering: {{ filterSummaryText }}
+        <button @click="clearAllFilters" class="clear-filter-btn">✕ Clear</button>
+      </div>
+
+      <div v-if="filtersExpanded" class="filter-section">
         <!-- Episode Filter -->
         <div class="filter-group">
-          <label>📺 Episodes:</label>
-          <div class="button-group">
+          <label @click="episodeFilterExpanded = !episodeFilterExpanded" class="filter-label-toggle">
+            📺 Episodes:
+            <span class="toggle-icon">{{ episodeFilterExpanded ? '▼' : '▶' }}</span>
+          </label>
+          <div v-if="episodeFilterExpanded" class="button-group">
             <button
               v-for="ep in episodes"
               :key="ep.id"
@@ -15,7 +30,7 @@
             >
               EP{{ ep.episodeId }}
             </button>
-            <button 
+            <button
               v-if="selectedEpisodes.size > 0"
               class="clear-btn"
               @click="selectedEpisodes.clear()"
@@ -25,10 +40,13 @@
           </div>
         </div>
 
-        <!-- Map Filter -->
-        <div class="filter-group">
-          <label>🗺️ Maps:</label>
-          <div class="button-group">
+        <!-- Map Filter (only show when episodes are selected) -->
+        <div v-if="selectedEpisodes.size > 0" class="filter-group">
+          <label @click="mapFilterExpanded = !mapFilterExpanded" class="filter-label-toggle">
+            🗺️ Maps:
+            <span class="toggle-icon">{{ mapFilterExpanded ? '▼' : '▶' }}</span>
+          </label>
+          <div v-if="mapFilterExpanded" class="button-group">
             <button
               v-for="m in availableMaps"
               :key="m.id"
@@ -37,7 +55,7 @@
             >
               Lv{{ m.level }} - {{ m.name }}
             </button>
-            <button 
+            <button
               v-if="selectedMaps.size > 0"
               class="clear-btn"
               @click="selectedMaps.clear()"
@@ -58,22 +76,10 @@
           />
         </div>
       </div>
+    </div>
 
-      <!-- Sorting -->
-      <div class="sort-section">
-        <label>🔀 Sort by:</label>
-        <select v-model="sortBy" class="sort-select">
-          <option value="status">Status</option>
-          <option value="level">Level</option>
-          <option value="nickname">Nickname</option>
-          <option value="updatedAt">Last Updated</option>
-          <option value="createdAt">Created</option>
-        </select>
-        <button @click="toggleSortOrder" class="order-btn">
-          {{ sortOrder === 'asc' ? '↑' : '↓' }}
-        </button>
-      </div>
-
+    <!-- Sorting, View, Delete, Quick Add (Always Visible) -->
+    <div class="controls-box">
       <!-- View Toggle -->
       <div class="view-toggle">
         <button
@@ -99,11 +105,42 @@
           {{ deleteMode ? '✓ Done' : '🗑️ Delete Mode' }}
         </button>
       </div>
+
+      <!-- Sorting -->
+      <div class="sort-section">
+        <label>🔀 Sort by:</label>
+        <select v-model="sortBy" class="sort-select">
+          <option value="status">Status</option>
+          <option value="level">Level</option>
+          <option value="nickname">Nickname</option>
+          <option value="updatedAt">Last Updated</option>
+          <option value="createdAt">Created</option>
+        </select>
+        <button @click="toggleSortOrder" class="order-btn">
+          {{ sortOrder === 'asc' ? '↑' : '↓' }}
+        </button>
+      </div>
+
+      <!-- Quick Add Tracker -->
+      <div v-if="canEdit" class="quick-add-section">
+        <label>⚡ Quick Add:</label>
+        <input
+          v-model="quickAddInput"
+          type="text"
+          placeholder="e.g. 721.5, 6622, 10523"
+          class="quick-add-input"
+          @keyup.enter="handleQuickAdd"
+          :title="'Format: [Level][Channel][Status]\nLv1-9: 721.5 (Lv7, Ch2, 1.5)\nLv10-99: 6621.7 (Lv66, Ch2, 1.7)\nLv100+: 10523 (Lv105, Ch2, 3)'"
+        />
+        <button @click="handleQuickAdd" class="quick-add-btn" :disabled="!quickAddInput">
+          Add
+        </button>
+      </div>
     </div>
 
     <!-- Tracker Count -->
     <div class="tracker-info">
-      Showing {{ filteredTrackers.length }} of {{ trackers.length }} trackers
+      Showing {{ filteredTrackers.length }} of {{ validTrackers.length }} trackers
     </div>
 
     <!-- Trackers Display -->
@@ -188,13 +225,21 @@
             <div class="tracker-timestamps">
               <div class="timestamp-row">
                 <span class="timestamp-label">🕒 Updated:</span>
-                <span class="timestamp-value" :title="formatFullTime(tracker.updatedAt)">
+                <span
+                  class="timestamp-value"
+                  :title="formatFullTime(tracker.updatedAt)"
+                  :style="{ color: getTimestampColor(tracker.updatedAt) }"
+                >
                   {{ getTimeAgo(tracker.updatedAt) }}
                 </span>
               </div>
               <div class="timestamp-row">
                 <span class="timestamp-label">📅 Created:</span>
-                <span class="timestamp-value" :title="formatFullTime(tracker.createdAt)">
+                <span
+                  class="timestamp-value"
+                  :title="formatFullTime(tracker.createdAt)"
+                  :style="{ color: getTimestampColor(tracker.createdAt) }"
+                >
                   {{ getTimeAgo(tracker.createdAt) }}
                 </span>
               </div>
@@ -243,7 +288,11 @@
               :title="'Press Enter or click away to save'"
             />
 
-            <span class="simple-time" :title="`Created: ${formatFullTime(tracker.createdAt)}\nUpdated: ${formatFullTime(tracker.updatedAt)}`">
+            <span
+              class="simple-time"
+              :title="`Created: ${formatFullTime(tracker.createdAt)}\nUpdated: ${formatFullTime(tracker.updatedAt)}`"
+              :style="{ color: getTimestampColor(tracker.updatedAt) }"
+            >
               <span class="time-icon">🕒</span>
               {{ getTimeAgo(tracker.updatedAt) }}
             </span>
@@ -269,7 +318,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { api } from '../services/api'
 
 const props = defineProps({
@@ -278,7 +327,8 @@ const props = defineProps({
     default: () => []
   },
   token: String,
-  role: String
+  role: String,
+  nickname: String
 })
 
 const emit = defineEmits(['update', 'delete'])
@@ -286,6 +336,10 @@ const emit = defineEmits(['update', 'delete'])
 // Data
 const episodes = ref([])
 const maps = ref([])
+
+// ✅ Real-time timestamp updates
+const currentTime = ref(Date.now())
+let timeUpdateInterval = null
 
 // Filters
 const selectedEpisodes = ref(new Set())
@@ -299,6 +353,14 @@ const sortOrder = ref('desc')
 // View
 const viewMode = ref('box')
 const deleteMode = ref(false)
+
+// ✅ Filter collapsed/expanded states
+const filtersExpanded = ref(true)
+const episodeFilterExpanded = ref(true)
+const mapFilterExpanded = ref(true)
+
+// ✅ Quick Add
+const quickAddInput = ref('')
 
 // Permissions
 const canEdit = computed(() => ['EDITOR', 'ADMIN'].includes(props.role))
@@ -345,16 +407,25 @@ const availableMaps = computed(() => {
   return maps.value.filter(m => selectedEpisodes.value.has(m.episodeNumber))
 })
 
+// ✅ Valid trackers (excluding old ones) - for showing total count
+const validTrackers = computed(() => {
+  const oneHourAgo = currentTime.value - (60 * 60 * 1000)
+  return props.trackers.filter(t => {
+    const updatedAt = new Date(t.updatedAt).getTime()
+    return updatedAt > oneHourAgo
+  })
+})
+
 // ✅ Filtered trackers
 const filteredTrackers = computed(() => {
-  let result = props.trackers
+  let result = validTrackers.value
 
-  // Filter by episodes
+  // Filter by episodes (only if episodes are selected)
   if (selectedEpisodes.value.size > 0) {
     result = result.filter(t => selectedEpisodes.value.has(t.episodeNumber))
   }
 
-  // Filter by maps
+  // Filter by maps (only if maps are selected)
   if (selectedMaps.value.size > 0) {
     result = result.filter(t => selectedMaps.value.has(t.mapId))
   }
@@ -370,13 +441,51 @@ const filteredTrackers = computed(() => {
 
   return result
 })
-// ✅ Auto-select EP10 & EP11 when episodes load
-watch(episodes, (newEpisodes) => {
-  if (newEpisodes.length > 0 && selectedEpisodes.value.size === 0) {
-    console.log('Auto-selecting EP10 & EP11')
-    selectedEpisodes.value = new Set([10, 11])
+// ✅ No auto-select - default to showing all trackers without episode filter
+
+// ✅ Smart filter summary text
+const filterSummaryText = computed(() => {
+  if (selectedMaps.value.size === 0) {
+    return ''
   }
-}, { immediate: true })
+
+  // Group selected maps by episode
+  const mapsByEpisode = {}
+  selectedMaps.value.forEach(mapId => {
+    const map = maps.value.find(m => m.id === mapId)
+    if (map) {
+      if (!mapsByEpisode[map.episodeNumber]) {
+        mapsByEpisode[map.episodeNumber] = []
+      }
+      mapsByEpisode[map.episodeNumber].push(map)
+    }
+  })
+
+  // For each episode, check if all maps are selected
+  const summaryParts = []
+  Object.entries(mapsByEpisode).forEach(([episodeNum, selectedMapsInEp]) => {
+    const allMapsInEp = maps.value.filter(m => m.episodeNumber === parseInt(episodeNum))
+
+    if (selectedMapsInEp.length === allMapsInEp.length) {
+      // All maps in this episode selected, show "EPX"
+      summaryParts.push(`EP${episodeNum}`)
+    } else {
+      // Only some maps selected, show individual levels
+      selectedMapsInEp.forEach(map => {
+        summaryParts.push(`Lv${map.level}`)
+      })
+    }
+  })
+
+  return summaryParts.join(', ')
+})
+
+// ✅ Clear all filters
+function clearAllFilters() {
+  selectedEpisodes.value.clear()
+  selectedMaps.value.clear()
+  nicknameFilter.value = ''
+}
 
 
 
@@ -423,6 +532,10 @@ const sortedTrackers = computed(() => {
 // ✅ Helper functions
 function getMapName(mapId) {
   return maps.value.find(m => m.id === mapId)?.name || 'Unknown'
+}
+
+function getMapLevel(mapId) {
+  return maps.value.find(m => m.id === mapId)?.level || '?'
 }
 
 // ✅ Get user's current nickname from user object, fallback to stored nickname
@@ -539,19 +652,28 @@ function getSimpleCircleStyle(status) {
 }
 
 
-// ✅ Helper: Time ago
+// ✅ Helper: Time ago (uses reactive currentTime for real-time updates)
 function getTimeAgo(timestamp) {
-  const now = Date.now()
-  const diff = now - new Date(timestamp).getTime()
+  const diff = currentTime.value - new Date(timestamp).getTime()
   const seconds = Math.floor(diff / 1000)
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
-  
+
   if (seconds < 60) return `${seconds}s`
   if (minutes < 60) return `${minutes}m`
   if (hours < 24) return `${hours}h`
   return `${days}d`
+}
+
+// ✅ Get timestamp color based on age
+function getTimestampColor(timestamp) {
+  const diff = currentTime.value - new Date(timestamp).getTime()
+  const minutes = Math.floor(diff / 1000 / 60)
+
+  if (minutes <= 5) return '#4caf50'  // Green: 0-5 minutes
+  if (minutes <= 15) return '#ff9800' // Orange: 5-15 minutes
+  return '#f44336'                     // Red: >15 minutes
 }
 
 // ✅ Helper: Format full time for tooltip
@@ -572,10 +694,104 @@ function formatStatus(status) {
 }
 
 
+// ✅ Parse quick add input
+function parseQuickAddInput(input) {
+  // Remove spaces
+  const cleaned = input.replace(/\s+/g, '')
+
+  // Extract the parts
+  let level, channel, status
+
+  // Try to match the pattern
+  // For Lv 1-9: single digit + single digit + decimal (e.g., "721.5" = Lv7, Ch2, 1.5)
+  // For Lv 10-99: two digits + single digit + decimal (e.g., "6621.7" = Lv66, Ch2, 1.7)
+  // For Lv 100+: three+ digits + single digit + decimal (e.g., "10523" = Lv105, Ch2, 3)
+
+  const match = cleaned.match(/^(\d+)(\d)(\d+\.?\d*)$/)
+
+  if (!match) {
+    return null
+  }
+
+  const [, levelPart, channelDigit, statusPart] = match
+
+  level = parseInt(levelPart, 10)
+  channel = parseInt(channelDigit, 10)
+  status = parseFloat(statusPart)
+
+  // Validate ranges
+  if (level < 1 || level > 999) {
+    return { error: 'Level must be between 1 and 999' }
+  }
+
+  if (channel < 1 || channel > 9) {
+    return { error: 'Channel must be between 1 and 9' }
+  }
+
+  if (status < 0 || status > 5) {
+    return { error: 'Status must be between 0 and 5' }
+  }
+
+  return { level, channel, status }
+}
+
+// ✅ Handle quick add
+async function handleQuickAdd() {
+  if (!quickAddInput.value.trim()) {
+    return
+  }
+
+  const parsed = parseQuickAddInput(quickAddInput.value)
+
+  if (!parsed) {
+    alert('Invalid format. Examples:\n• Lv1-9: 721.5 (Lv7, Ch2, 1.5)\n• Lv10-99: 6621.7 (Lv66, Ch2, 1.7)\n• Lv100+: 10523 (Lv105, Ch2, 3)')
+    return
+  }
+
+  if (parsed.error) {
+    alert(parsed.error)
+    return
+  }
+
+  const { level, channel, status } = parsed
+
+  // Find the map for this level
+  const map = maps.value.find(m => m.level === level)
+
+  if (!map) {
+    alert(`No map found for level ${level}`)
+    return
+  }
+
+  try {
+    // Create the tracker via API
+    const response = await api.createTracker({
+      episodeNumber: map.episodeNumber,
+      mapId: map.id,
+      channelId: channel,
+      level: map.level,
+      status: status,
+      nickname: props.nickname
+    })
+
+    console.log('[TrackerBoard] Quick add tracker created:', response.data)
+
+    // Emit to parent to add to the list
+    emit('update', response.data)
+
+    // Clear input
+    quickAddInput.value = ''
+
+  } catch (err) {
+    console.error('Failed to quick add tracker:', err)
+    alert('Failed to add tracker: ' + (err.response?.data?.error || err.message))
+  }
+}
+
 // ✅ Actions
 async function updateStatus(tracker) {
   if (!canEdit.value) return
-  
+
   try {
     // ✅ Validate status range
     const status = Number(tracker.status)
@@ -590,10 +806,10 @@ async function updateStatus(tracker) {
     })
 
     console.log('[TrackerBoard] Status updated:', response.data)
-    
+
     // ✅ Emit to parent to update the tracker list
     emit('update', response.data || tracker)
-    
+
   } catch (err) {
     console.error('Failed to update tracker:', err)
     alert('Failed to update status: ' + (err.response?.data?.error || err.message))
@@ -617,7 +833,21 @@ async function deleteTracker(tracker) {
 }
 
 // ✅ Load data on mount
-onMounted(fetchData)
+onMounted(() => {
+  fetchData()
+
+  // ✅ Update currentTime every second for real-time timestamp updates
+  timeUpdateInterval = setInterval(() => {
+    currentTime.value = Date.now()
+  }, 1000)
+})
+
+// ✅ Cleanup on unmount
+onBeforeUnmount(() => {
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval)
+  }
+})
 </script>
 
 <style scoped>
@@ -625,11 +855,86 @@ onMounted(fetchData)
   padding: 20px;
 }
 
+.controls-box {
+  background: #1e1e1e;
+  padding: 16px 20px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
 .controls {
   background: #1e1e1e;
   padding: 20px;
   border-radius: 12px;
   margin-bottom: 20px;
+}
+
+.filter-controls {
+  width: 100%;
+}
+
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  padding: 8px 12px;
+  background: #2a2a2a;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  transition: background 0.2s;
+}
+
+.filter-header:hover {
+  background: #333;
+}
+
+.filter-summary {
+  background: #2a2a2a;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: #fff;
+}
+
+.filter-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #4caf50;
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.clear-filter-btn {
+  padding: 4px 10px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: auto;
+  transition: background 0.2s;
+}
+
+.clear-filter-btn:hover {
+  background: #d32f2f;
 }
 
 .filter-section {
@@ -646,6 +951,24 @@ onMounted(fetchData)
   font-weight: 600;
   color: #aaa;
   margin-bottom: 8px;
+}
+
+.filter-label-toggle {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.2s;
+}
+
+.filter-label-toggle:hover {
+  color: #fff;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  transition: transform 0.2s;
 }
 
 .button-group {
@@ -702,7 +1025,15 @@ onMounted(fetchData)
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+}
+
+.sort-section label,
+.view-toggle label,
+.delete-toggle label {
+  margin-bottom: 0;
+  color: #aaa;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .sort-select {
@@ -722,6 +1053,90 @@ onMounted(fetchData)
   color: #fff;
   cursor: pointer;
   font-size: 16px;
+  transition: all 0.2s;
+}
+
+.order-btn:hover {
+  background: #333;
+}
+
+.view-toggle button,
+.delete-toggle button {
+  padding: 6px 12px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.view-toggle button:hover,
+.delete-toggle button:hover {
+  background: #333;
+}
+
+.view-toggle button.active {
+  background: #4caf50;
+  color: white;
+  border-color: #4caf50;
+}
+
+.delete-toggle button.active {
+  background: #f44336;
+  color: white;
+  border-color: #f44336;
+}
+
+.quick-add-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.quick-add-input {
+  width: 160px;
+  padding: 6px 12px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.quick-add-input:focus {
+  outline: none;
+  border-color: #4caf50;
+}
+
+.quick-add-input::placeholder {
+  color: #666;
+}
+
+.quick-add-btn {
+  padding: 6px 16px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.quick-add-btn:hover:not(:disabled) {
+  background: #45a049;
+  transform: translateY(-1px);
+}
+
+.quick-add-btn:disabled {
+  background: #666;
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .tracker-info {
@@ -987,13 +1402,14 @@ onMounted(fetchData)
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
-  color: #666;
+  font-size: 12px;
+  font-weight: 600;
   cursor: help;
+  transition: color 0.3s ease;
 }
 
 .time-icon {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .delete-btn-simple {
@@ -1036,17 +1452,20 @@ onMounted(fetchData)
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11px;
-  margin-bottom: 4px;
+  font-size: 13px;
+  margin-bottom: 6px;
 }
 
 .timestamp-label {
-  color: #666;
+  color: #888;
+  font-weight: 500;
 }
 
 .timestamp-value {
-  color: #aaa;
+  font-weight: 600;
+  font-size: 14px;
   cursor: help;
+  transition: color 0.3s ease;
 }
 
 /* ✅ Simple Status Circle with Gradient Support */

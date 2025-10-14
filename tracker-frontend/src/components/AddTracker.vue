@@ -31,12 +31,12 @@
         <div class="section">
           <div class="section-label">
             🗺️ Map
-            <span v-if="filteredMaps.length > 0" class="count">
+            <span v-if="selectedEpisodes.size > 0 && filteredMaps.length > 0" class="count">
               ({{ filteredMaps.length }})
             </span>
           </div>
-          
-          <!-- Favorites first -->
+
+          <!-- Favorites (always shown) -->
           <div v-if="favoriteMaps.length > 0" class="map-section">
             <div class="subsection-label">⭐ Favorites</div>
             <div class="btn-group">
@@ -55,34 +55,39 @@
             </div>
           </div>
 
-          <!-- All filtered maps -->
-          <div v-if="filteredMaps.length > 0" class="map-section">
-            <div v-if="favoriteMaps.length > 0" class="subsection-label">
-              All Maps
-            </div>
-            <div class="btn-group">
-              <button
-                v-for="m in filteredMaps"
-                :key="m.id"
-                :class="['btn map-btn', { active: m.id === mapId }]"
-                @click="selectMap(m)"
-              >
-                <span class="map-info">
-                  <span class="map-level">Lv{{ m.level }}</span>
-                  {{ m.name }}
-                </span>
-                <span 
-                  class="star" 
-                  :class="{ filled: isFavorite(m.id) }"
-                  @click.stop="toggleFavorite(m.id)"
+          <!-- All filtered maps (only shown when episodes selected) -->
+          <div v-if="selectedEpisodes.size > 0" class="map-section">
+            <div v-if="filteredMaps.length > 0">
+              <div class="subsection-label">
+                {{ favoriteMaps.length > 0 ? 'Other Maps' : 'All Maps' }}
+              </div>
+              <div class="btn-group">
+                <button
+                  v-for="m in filteredMaps.filter(m => !isFavorite(m.id))"
+                  :key="m.id"
+                  :class="['btn map-btn', { active: m.id === mapId }]"
+                  @click="selectMap(m)"
                 >
-                  {{ isFavorite(m.id) ? '⭐' : '☆' }}
-                </span>
-              </button>
+                  <span class="map-info">
+                    <span class="map-level">Lv{{ m.level }}</span>
+                    {{ m.name }}
+                  </span>
+                  <span
+                    class="star"
+                    @click.stop="toggleFavorite(m.id)"
+                  >
+                    ☆
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div v-else class="empty-state">
+              No maps found for selected episodes
             </div>
           </div>
 
-          <div v-else class="empty-state">
+          <!-- Show hint when no episode selected and no favorites -->
+          <div v-if="selectedEpisodes.size === 0 && favoriteMaps.length === 0" class="empty-state">
             Select an episode to see maps
           </div>
         </div>
@@ -212,7 +217,8 @@ const filteredMaps = computed(() => {
 })
 
 const favoriteMaps = computed(() => {
-  return filteredMaps.value.filter(m => isFavorite(m.id))
+  // Show favorites even when no episode is selected
+  return maps.value.filter(m => isFavorite(m.id)).sort((a, b) => a.level - b.level)
 })
 
 const selectedMap = computed(() => {
@@ -385,11 +391,12 @@ onMounted(() => {
 
 <style scoped>
 .add-tracker {
-  margin: 20px;
+  margin: 0 20px 20px 20px;
   background: #1e1e1e;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  max-width: calc(100vw - 40px);
 }
 
 .toggle-btn {

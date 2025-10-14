@@ -13,7 +13,7 @@ import { createSocket } from './socket.js';
 
 const app = express();
 
-// ✅ Updated helmet config for Socket.io
+// ✅ Updated helmet config for Socket.io and Vue I18n
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -22,10 +22,11 @@ app.use(
         scriptSrc: [
           "'self'",
           "'unsafe-inline'",
+          "'unsafe-eval'",  // ✅ Required for Vue I18n message compilation
           "https://cdn.socket.io",
           "https://cdn.jsdelivr.net"
         ],
-        connectSrc: ["'self'", "ws://localhost:8080", "http://localhost:8080"],  // ✅ Be explicit
+        connectSrc: ["'self'", "ws://localhost:8080", "http://localhost:8080"],
         styleSrc: ["'self'", "'unsafe-inline'"]
       },
     },

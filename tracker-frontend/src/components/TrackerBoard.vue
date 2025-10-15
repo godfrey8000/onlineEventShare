@@ -75,6 +75,18 @@
             class="nickname-input"
           />
         </div>
+
+        <!-- Full Status Filter -->
+        <div class="filter-group">
+          <label class="full-filter-toggle">
+            <input
+              type="checkbox"
+              v-model="showOnlyFull"
+              class="full-filter-checkbox"
+            />
+            <span>👥 Show Only Full Parties</span>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -148,7 +160,7 @@
       <div
         v-for="tracker in sortedTrackers"
         :key="tracker.id"
-        :class="['tracker-card', viewMode]"
+        :class="['tracker-card', viewMode, { 'is-full': tracker.isFull }]"
       >
         <!-- Box View -->
         <template v-if="viewMode === 'box'">
@@ -161,7 +173,18 @@
 
           <div class="tracker-body">
             <div class="tracker-channel">Ch{{ tracker.channelId }}</div>
-            
+
+            <!-- Full Status Checkbox -->
+            <label class="full-checkbox">
+              <input
+                type="checkbox"
+                v-model="tracker.isFull"
+                @change="updateFullStatus(tracker)"
+                :disabled="!canEdit"
+              />
+              <span>👥 {{ t('tracker.mapFull') }}</span>
+            </label>
+
             <!-- Progress Circle -->
               <div class="progress-circle">
                 <svg width="80" height="80" viewBox="0 0 80 80">
@@ -224,7 +247,7 @@
             <!-- Timestamps -->
             <div class="tracker-timestamps">
               <div class="timestamp-row">
-                <span class="timestamp-label">🕒 Updated:</span>
+                <span class="timestamp-label">🕒 {{ t('tracker.updated') }}:</span>
                 <span
                   class="timestamp-value"
                   :title="formatFullTime(tracker.updatedAt)"
@@ -234,7 +257,7 @@
                 </span>
               </div>
               <div class="timestamp-row">
-                <span class="timestamp-label">📅 Created:</span>
+                <span class="timestamp-label">📅 {{ t('tracker.created') }}:</span>
                 <span
                   class="timestamp-value"
                   :title="formatFullTime(tracker.createdAt)"
@@ -268,7 +291,18 @@
             </span>
             
             <span class="simple-channel">Ch{{ tracker.channelId }}</span>
-            
+
+            <!-- Full Status Checkbox -->
+            <label class="simple-full-checkbox">
+              <input
+                type="checkbox"
+                v-model="tracker.isFull"
+                @change="updateFullStatus(tracker)"
+                :disabled="!canEdit"
+              />
+              <span class="full-text">{{ t('tracker.mapFullSimple') }}</span>
+            </label>
+
             <!-- Status Circle with partial fill -->
             <span class="simple-status-circle" :style="getSimpleCircleStyle(tracker.status)">
               {{ getStatusText(tracker.status) }}
@@ -288,14 +322,24 @@
               :title="'Press Enter or click away to save'"
             />
 
-            <span
-              class="simple-time"
-              :title="`Created: ${formatFullTime(tracker.createdAt)}\nUpdated: ${formatFullTime(tracker.updatedAt)}`"
-              :style="{ color: getTimestampColor(tracker.updatedAt) }"
-            >
-              <span class="time-icon">🕒</span>
-              {{ getTimeAgo(tracker.updatedAt) }}
-            </span>
+            <div class="simple-times">
+              <span
+                class="simple-time"
+                :title="`${t('tracker.updated')}: ${formatFullTime(tracker.updatedAt)}`"
+                :style="{ color: getTimestampColor(tracker.updatedAt) }"
+              >
+                <span class="time-icon">🕒</span>
+                {{ getTimeAgo(tracker.updatedAt) }}
+              </span>
+              <span
+                class="simple-time"
+                :title="`${t('tracker.created')}: ${formatFullTime(tracker.createdAt)}`"
+                :style="{ color: getTimestampColor(tracker.createdAt) }"
+              >
+                <span class="time-icon">📅</span>
+                {{ getTimeAgo(tracker.createdAt) }}
+              </span>
+            </div>
 
             <button
               v-if="deleteMode && canDelete"
@@ -348,6 +392,7 @@ let timeUpdateInterval = null
 const selectedEpisodes = ref(new Set())
 const selectedMaps = ref(new Set())
 const nicknameFilter = ref('')
+const showOnlyFull = ref(false)
 
 // Sorting
 const sortBy = ref('status')
@@ -442,6 +487,11 @@ const filteredTrackers = computed(() => {
     })
   }
 
+  // Filter by full status
+  if (showOnlyFull.value) {
+    result = result.filter(t => t.isFull === true)
+  }
+
   return result
 })
 // ✅ No auto-select - default to showing all trackers without episode filter
@@ -488,6 +538,7 @@ function clearAllFilters() {
   selectedEpisodes.value.clear()
   selectedMaps.value.clear()
   nicknameFilter.value = ''
+  showOnlyFull.value = false
 }
 
 
@@ -819,10 +870,26 @@ async function updateStatus(tracker) {
   }
 }
 
-function confirmDelete(tracker) {
-  if (confirm(`Delete tracker for ${getUserNickname(tracker)}?`)) {
-    deleteTracker(tracker)
+// ✅ Update full status
+async function updateFullStatus(tracker) {
+  if (!canEdit.value) return
+
+  try {
+    const response = await api.updateTracker(tracker.id, {
+      isFull: tracker.isFull
+    })
+
+    console.log('[TrackerBoard] Full status updated:', response.data)
+    emit('update', response.data || tracker)
+
+  } catch (err) {
+    console.error('Failed to update full status:', err)
+    alert('Failed to update full status: ' + (err.response?.data?.error || err.message))
   }
+}
+
+function confirmDelete(tracker) {
+  deleteTracker(tracker)
 }
 
 async function deleteTracker(tracker) {
@@ -1170,6 +1237,12 @@ onBeforeUnmount(() => {
   padding: 16px;
   position: relative;
   transition: transform 0.2s;
+  border: 2px solid transparent;
+}
+
+.tracker-card.is-full {
+  border-color: #f44336;
+  box-shadow: 0 0 10px rgba(244, 67, 54, 0.3);
 }
 
 .tracker-card:hover {
@@ -1517,5 +1590,79 @@ onBeforeUnmount(() => {
 .simple-status-input:focus {
   outline: none;
   border-color: #4caf50;
+}
+
+/* ✅ Full Status Checkboxes */
+.full-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.full-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #4caf50;
+}
+
+.full-checkbox input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.simple-full-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  color: #aaa;
+}
+
+.simple-full-checkbox input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #f44336;
+}
+
+.simple-full-checkbox input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.full-text {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.simple-times {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.full-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  color: #aaa;
+  margin-bottom: 0 !important;
+}
+
+.full-filter-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #4caf50;
 }
 </style>

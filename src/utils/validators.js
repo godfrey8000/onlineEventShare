@@ -22,5 +22,6 @@ export const CreateTracker = z.object({
 
 export const UpdateTracker = z.object({
   status: z.number().min(0).max(5).optional(),
-  nickname: z.string().min(1).optional()
+  nickname: z.string().min(1).optional(),
+  isFull: z.boolean().optional()
 });

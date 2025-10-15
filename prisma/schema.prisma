@@ -84,6 +84,7 @@ model Tracker {
   level      Int?
   status     Decimal    @default(0)
   nickname   String?
+  isFull     Boolean    @default(false)
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 

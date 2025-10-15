@@ -65,7 +65,11 @@ const messages = {
       boxView: 'Box View',
       simpleView: 'Simple View',
       deleteMode: 'Delete Mode',
-      quickAdd: 'Quick Add:'
+      quickAdd: 'Quick Add:',
+      created: 'Created',
+      updated: 'Updated',
+      mapFull: 'Map Full',
+      mapFullSimple: 'Full?'
     },
     chat: {
       title: 'Chat Room',
@@ -156,7 +160,11 @@ const messages = {
       boxView: '方塊檢視',
       simpleView: '簡單檢視',
       deleteMode: '刪除模式',
-      quickAdd: '快速新增:'
+      quickAdd: '快速新增:',
+      created: '創建時間',
+      updated: '更新時間',
+      mapFull: '地圖達最大值',
+      mapFullSimple: '滿?'
     },
     chat: {
       title: '聊天室',
@@ -247,7 +255,11 @@ const messages = {
       boxView: 'ボックス表示',
       simpleView: 'シンプル表示',
       deleteMode: '削除モード',
-      quickAdd: 'クイック追加:'
+      quickAdd: 'クイック追加:',
+      created: '作成日時',
+      updated: '更新時刻',
+      mapFull: 'マップ到達上限値',
+      mapFullSimple: '上限?'
     },
     chat: {
       title: 'チャットルーム',

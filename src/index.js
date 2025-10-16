@@ -11,6 +11,7 @@ import mapsRoutes from './routes/maps.routes.js';
 import chatRoutes from './routes/chat.routes.js';  // ✅ Add this
 import { createSocket } from './socket.js';
 import { scheduleHousekeeping, runHousekeeping } from './jobs/housekeeping.js';
+import { authRequired, authorizeRole } from './middleware/auth.js';
 
 const app = express();
 
@@ -66,10 +67,10 @@ app.use('/api', chatRoutes);  // ✅ Add chat routes
 // Health check
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-// ✅ Housekeeping manual trigger (admin only - add auth if needed)
-app.post('/api/housekeeping/run', async (req, res) => {
+// ✅ Housekeeping manual trigger (ADMIN only - SECURED)
+app.post('/api/housekeeping/run', authRequired, authorizeRole('ADMIN'), async (req, res) => {
   try {
-    console.log('[API] Manual housekeeping triggered');
+    console.log('[API] Manual housekeeping triggered by:', req.user.username);
     const result = await runHousekeeping();
     res.json(result);
   } catch (err) {

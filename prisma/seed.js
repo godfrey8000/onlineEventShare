@@ -3,6 +3,19 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
+  console.log('🌱 Checking if database needs seeding...')
+
+  // Check if data already exists
+  const episodeCount = await prisma.episode.count()
+  const mapCount = await prisma.map.count()
+  const channelCount = await prisma.channel.count()
+
+  if (episodeCount > 0 && mapCount > 0 && channelCount > 0) {
+    console.log('✅ Database already seeded (Episodes: ' + episodeCount + ', Maps: ' + mapCount + ', Channels: ' + channelCount + ')')
+    console.log('⏭️  Skipping seed to prevent duplicates')
+    return
+  }
+
   console.log('🌱 Seeding database...')
 
   // Create Episodes

@@ -10,6 +10,7 @@ import trackersRoutes from './routes/trackers.routes.js';
 import mapsRoutes from './routes/maps.routes.js';
 import chatRoutes from './routes/chat.routes.js';  // ✅ Add this
 import { createSocket } from './socket.js';
+import { scheduleHousekeeping, runHousekeeping } from './jobs/housekeeping.js';
 
 const app = express();
 
@@ -65,6 +66,18 @@ app.use('/api', chatRoutes);  // ✅ Add chat routes
 // Health check
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
+// ✅ Housekeeping manual trigger (admin only - add auth if needed)
+app.post('/api/housekeeping/run', async (req, res) => {
+  try {
+    console.log('[API] Manual housekeeping triggered');
+    const result = await runHousekeeping();
+    res.json(result);
+  } catch (err) {
+    console.error('[API] Housekeeping failed:', err);
+    res.status(500).json({ error: 'Housekeeping failed', details: err.message });
+  }
+});
+
 // ✅ SPA fallback - serve index.html for non-API routes
 app.get('*', (req, res, next) => {
   // If it's an API route, let it 404
@@ -91,6 +104,9 @@ server.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`✅ CORS enabled for: ${CORS_ORIGIN}`);
   console.log(`✅ Socket.io ready`);
+
+  // ✅ Initialize housekeeping jobs
+  scheduleHousekeeping();
 });
 
 // ✅ Graceful shutdown

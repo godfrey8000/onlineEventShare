@@ -69,7 +69,11 @@ const messages = {
       created: 'Created',
       updated: 'Updated',
       mapFull: 'Map Full',
-      mapFullSimple: 'Full?'
+      mapFullSimple: 'Full?',
+      full: 'Full',
+      countdown: 'Countdown',
+      user: 'User',
+      actions: 'Actions'
     },
     chat: {
       title: 'Chat Room',
@@ -164,7 +168,11 @@ const messages = {
       created: '創建時間',
       updated: '更新時間',
       mapFull: '地圖達最大值',
-      mapFullSimple: '滿?'
+      mapFullSimple: '滿?',
+      full: '滿',
+      countdown: '倒數',
+      user: '使用者',
+      actions: '操作'
     },
     chat: {
       title: '聊天室',
@@ -259,7 +267,11 @@ const messages = {
       created: '作成日時',
       updated: '更新時刻',
       mapFull: 'マップ到達上限値',
-      mapFullSimple: '上限?'
+      mapFullSimple: '上限?',
+      full: '上限',
+      countdown: 'カウントダウン',
+      user: 'ユーザー',
+      actions: 'アクション'
     },
     chat: {
       title: 'チャットルーム',

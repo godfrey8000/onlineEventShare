@@ -90,7 +90,7 @@
       </div>
     </div>
 
-    <!-- Sorting, View, Delete, Quick Add (Always Visible) -->
+    <!-- Sorting, View, Delete, Quick Add (All in One Line) -->
     <div class="controls-box">
       <!-- View Toggle -->
       <div class="view-toggle">
@@ -106,15 +106,11 @@
         >
           📋 {{ t('tracker.simpleView') }}
         </button>
-      </div>
-
-      <!-- Delete Mode Toggle -->
-      <div v-if="canDelete" class="delete-toggle">
         <button
-          :class="{ active: deleteMode }"
-          @click="deleteMode = !deleteMode"
+          :class="{ active: viewMode === 'list' }"
+          @click="viewMode = 'list'"
         >
-          {{ deleteMode ? '✓ Done' : '🗑️ ' + t('tracker.deleteMode') }}
+          📊 列表檢視
         </button>
       </div>
 
@@ -130,6 +126,16 @@
         </select>
         <button @click="toggleSortOrder" class="order-btn">
           {{ sortOrder === 'asc' ? '↑' : '↓' }}
+        </button>
+      </div>
+
+      <!-- Rapid Edit Mode Toggle -->
+      <div v-if="canEdit" class="rapid-edit-toggle">
+        <button
+          :class="{ active: rapidEditMode }"
+          @click="rapidEditMode = !rapidEditMode"
+        >
+          {{ rapidEditMode ? '✓ 快速編輯中' : '⚡ 快速編輯' }}
         </button>
       </div>
 
@@ -165,6 +171,20 @@
 
     <!-- Trackers Display -->
     <div :class="['trackers-container', viewMode]">
+      <!-- List View Header -->
+      <div v-if="viewMode === 'list' && sortedTrackers.length > 0" class="list-header">
+        <span class="list-header-cell">{{ t('tracker.level') }}</span>
+        <span class="list-header-cell">{{ t('tracker.map') }}</span>
+        <span class="list-header-cell">{{ t('tracker.channel') }}</span>
+        <span class="list-header-cell">{{ t('tracker.full') }}</span>
+        <span class="list-header-cell">{{ t('tracker.status') }}</span>
+        <span class="list-header-cell">{{ t('tracker.countdown') }}</span>
+        <span class="list-header-cell">{{ t('tracker.updated') }}</span>
+        <span class="list-header-cell">{{ t('tracker.created') }}</span>
+        <span class="list-header-cell">{{ t('tracker.user') }}</span>
+        <span v-if="rapidEditMode && canEdit" class="list-header-cell">{{ t('tracker.actions') }}</span>
+      </div>
+
       <div
         v-for="tracker in sortedTrackers"
         :key="tracker.id"
@@ -181,7 +201,7 @@
 
           <div class="tracker-body">
             <!-- Channel Display/Editor -->
-            <div v-if="editMode[tracker.id]" class="channel-selector">
+            <div v-if="editMode[tracker.id] || rapidEditMode" class="channel-selector">
               <label>📡頻道:</label>
               <select v-model.number="tracker.channelId" class="channel-select">
                 <option v-for="ch in 10" :key="ch" :value="ch">Ch{{ ch }}</option>
@@ -194,7 +214,7 @@
               <input
                 type="checkbox"
                 v-model="tracker.isFull"
-                :disabled="!canEdit || !editMode[tracker.id]"
+                :disabled="!canEdit || (!editMode[tracker.id] && !rapidEditMode)"
               />
               <span>👥 {{ t('tracker.mapFull') }}</span>
             </label>
@@ -246,7 +266,7 @@
               </div>
 
             <!-- Inline Status Editor -->
-            <div v-if="editMode[tracker.id]" class="status-editor">
+            <div v-if="editMode[tracker.id] || rapidEditMode" class="status-editor">
               <input
                 v-model.number="tracker.status"
                 type="number"
@@ -256,8 +276,8 @@
               />
             </div>
 
-            <!-- Countdown Timer (for status < 1) -->
-            <div v-if="Number(tracker.status) < 1 && editMode[tracker.id]" class="countdown-section">
+            <!-- Countdown Timer (for status < 1) - Always show if can edit -->
+            <div v-if="Number(tracker.status) < 1 && canEdit" class="countdown-section">
               <div v-if="tracker.countdownEndsAt" class="countdown-display">
                 ⏱️ {{ getCountdownText(tracker.countdownEndsAt) }}
               </div>
@@ -311,15 +331,34 @@
             </div>
           </div>
 
-          <!-- Edit/Commit/Cancel Buttons -->
+          <!-- Edit/Commit/Delete Buttons -->
           <div v-if="canEdit && !deleteMode" class="edit-actions">
-            <button
-              v-if="!editMode[tracker.id]"
-              @click="toggleEditMode(tracker)"
-              class="edit-btn"
-            >
-              ✏️ 編輯
-            </button>
+            <!-- Normal edit mode -->
+            <template v-if="!rapidEditMode">
+              <button
+                v-if="!editMode[tracker.id]"
+                @click="toggleEditMode(tracker)"
+                class="edit-btn"
+              >
+                ✏️ 編輯
+              </button>
+              <template v-else>
+                <button
+                  @click="commitEdit(tracker)"
+                  class="commit-btn"
+                >
+                  ✓ 儲存
+                </button>
+                <button
+                  @click="cancelEdit(tracker)"
+                  class="cancel-btn"
+                >
+                  ✕ 取消
+                </button>
+              </template>
+            </template>
+
+            <!-- Rapid edit mode - show commit and delete -->
             <template v-else>
               <button
                 @click="commitEdit(tracker)"
@@ -328,15 +367,15 @@
                 ✓ 儲存
               </button>
               <button
-                @click="cancelEdit(tracker)"
-                class="cancel-btn"
+                @click="confirmDelete(tracker)"
+                class="delete-btn-rapid"
               >
-                ✕ 取消
+                🗑️ 刪除
               </button>
             </template>
           </div>
 
-          <!-- Delete Button -->
+          <!-- Delete Button (in delete mode) -->
           <button
             v-if="deleteMode && canDelete"
             class="delete-btn"
@@ -347,7 +386,7 @@
         </template>
 
         <!-- Simple View -->
-        <template v-else>
+        <template v-else-if="viewMode === 'simple'">
           <div class="simple-compact">
             <span class="simple-nickname" :title="getUserNickname(tracker)">
               {{ getUserNickname(tracker) }}
@@ -417,6 +456,100 @@
             </button>
           </div>
         </template>
+
+        <!-- List View -->
+        <template v-else-if="viewMode === 'list'">
+          <div class="list-row">
+            <span class="list-level">Lv{{ tracker.level }}</span>
+            <span class="list-map" :title="getMapName(tracker.mapId)">{{ getMapName(tracker.mapId) }}</span>
+
+            <!-- Channel Display/Editor -->
+            <span v-if="!rapidEditMode" class="list-channel">Ch{{ tracker.channelId }}</span>
+            <select v-else v-model.number="tracker.channelId" class="list-channel-select">
+              <option v-for="ch in 10" :key="ch" :value="ch">Ch{{ ch }}</option>
+            </select>
+
+            <!-- isFull Checkbox -->
+            <label class="list-full-checkbox">
+              <input
+                type="checkbox"
+                v-model="tracker.isFull"
+                :disabled="!canEdit || !rapidEditMode"
+              />
+              <span>Full</span>
+            </label>
+
+            <!-- Status Circle + Number Display/Editor -->
+            <div class="list-status-container">
+              <span class="list-status-circle" :style="getSimpleCircleStyle(tracker.status)">
+                {{ getStatusText(tracker.status) }}
+              </span>
+              <span v-if="!rapidEditMode" class="list-status-text" :style="{ color: getProgressColor(tracker.status) }">
+                {{ formatStatus(tracker.status) }}
+              </span>
+              <input
+                v-else
+                v-model.number="tracker.status"
+                type="number"
+                min="0"
+                max="5"
+                step="0.1"
+                class="list-status-input"
+              />
+            </div>
+
+            <!-- Countdown Column -->
+            <div class="list-countdown">
+              <!-- Show countdown controls in rapid edit mode for status < 1 -->
+              <div v-if="rapidEditMode && canEdit && Number(tracker.status) < 1" class="list-countdown-edit">
+                <input
+                  v-model="countdownMinutes[tracker.id]"
+                  type="text"
+                  placeholder="480"
+                  class="list-countdown-input"
+                  title="Enter minutes (480) or hhmmss (53000 = 5h30m)"
+                />
+                <button
+                  @click="setCountdown(tracker)"
+                  class="list-countdown-btn"
+                  :disabled="!countdownMinutes[tracker.id]"
+                >
+                  設定
+                </button>
+                <button
+                  v-if="tracker.countdownEndsAt"
+                  @click="clearCountdown(tracker)"
+                  class="list-countdown-clear"
+                >
+                  ✕
+                </button>
+              </div>
+              <!-- Display countdown when not in rapid edit mode -->
+              <span v-else-if="tracker.countdownEndsAt && Number(tracker.status) < 1" class="countdown-text">
+                ⏱️ {{ getCountdownText(tracker.countdownEndsAt) }}
+              </span>
+              <span v-else class="countdown-empty">-</span>
+            </div>
+
+            <span class="list-time" :style="{ color: getTimestampColor(tracker.updatedAt) }">
+              {{ getTimeAgo(tracker.updatedAt) }}
+            </span>
+            <span class="list-time" :style="{ color: getTimestampColor(tracker.createdAt) }">
+              {{ getTimeAgo(tracker.createdAt) }}
+            </span>
+            <span class="list-nickname">{{ getUserNickname(tracker) }}</span>
+
+            <!-- Rapid Edit Buttons -->
+            <div v-if="rapidEditMode && canEdit" class="list-actions">
+              <button @click="commitEdit(tracker)" class="list-commit-btn" title="儲存">
+                ✓
+              </button>
+              <button @click="confirmDelete(tracker)" class="list-delete-btn" title="刪除">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- Empty State -->
@@ -484,6 +617,7 @@ const countdownMinutes = ref({})
 // ✅ Edit mode for each tracker
 const editMode = ref({}) // { trackerId: true/false }
 const editCache = ref({}) // Store original values for cancel
+const rapidEditMode = ref(false) // Rapid edit mode - all trackers editable at once
 
 // Permissions
 const canEdit = computed(() => ['EDITOR', 'ADMIN'].includes(props.role))
@@ -1055,7 +1189,8 @@ function toggleEditMode(tracker) {
 }
 
 async function commitEdit(tracker) {
-  if (!canEdit.value || !editMode.value[tracker.id]) return
+  // ✅ Allow commits in both individual edit mode AND rapid edit mode
+  if (!canEdit.value || (!editMode.value[tracker.id] && !rapidEditMode.value)) return
 
   try {
     // Validate status range
@@ -1228,8 +1363,8 @@ onBeforeUnmount(() => {
   margin-bottom: 12px;
   display: flex;
   align-items: center;
-  gap: 24px;
-  flex-wrap: wrap;
+  gap: 12px;
+  flex-wrap: nowrap;
 }
 
 .controls {
@@ -1391,6 +1526,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .sort-section label,
@@ -1400,6 +1536,37 @@ onBeforeUnmount(() => {
   color: #aaa;
   font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.view-toggle button,
+.delete-toggle button {
+  padding: 6px 10px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.view-toggle button:hover,
+.delete-toggle button:hover {
+  background: #333;
+}
+
+.view-toggle button.active {
+  background: #4caf50;
+  color: white;
+  border-color: #4caf50;
+}
+
+.delete-toggle button.active {
+  background: #f44336;
+  color: white;
+  border-color: #f44336;
 }
 
 .sort-select {
@@ -1426,7 +1593,6 @@ onBeforeUnmount(() => {
   background: #333;
 }
 
-.view-toggle button,
 .delete-toggle button {
   padding: 6px 12px;
   background: #2a2a2a;
@@ -1436,17 +1602,11 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font-size: 13px;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
-.view-toggle button:hover,
 .delete-toggle button:hover {
   background: #333;
-}
-
-.view-toggle button.active {
-  background: #4caf50;
-  color: white;
-  border-color: #4caf50;
 }
 
 .delete-toggle button.active {
@@ -1460,16 +1620,21 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   margin-left: auto;
+  flex-shrink: 0;
+}
+
+.quick-add-section label {
+  white-space: nowrap;
 }
 
 .quick-add-input {
-  width: 160px;
-  padding: 6px 12px;
+  width: 100px;
+  padding: 6px 8px;
   background: #2a2a2a;
   border: 1px solid #444;
   border-radius: 6px;
   color: #fff;
-  font-size: 14px;
+  font-size: 12px;
   transition: border-color 0.2s;
 }
 
@@ -1483,13 +1648,13 @@ onBeforeUnmount(() => {
 }
 
 .quick-add-countdown-input {
-  width: 120px;
-  padding: 6px 12px;
+  width: 80px;
+  padding: 6px 8px;
   background: #2a2a2a;
   border: 1px solid #444;
   border-radius: 6px;
   color: #fff;
-  font-size: 14px;
+  font-size: 12px;
   transition: border-color 0.2s;
 }
 
@@ -1503,15 +1668,16 @@ onBeforeUnmount(() => {
 }
 
 .quick-add-btn {
-  padding: 6px 16px;
+  padding: 6px 12px;
   background: #4caf50;
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .quick-add-btn:hover:not(:disabled) {
@@ -2145,5 +2311,350 @@ onBeforeUnmount(() => {
 .channel-select:focus {
   outline: none;
   border-color: #2196f3;
+}
+
+/* ✅ Rapid Edit Mode Styles */
+.rapid-edit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rapid-edit-toggle {
+  flex-shrink: 0;
+}
+
+.rapid-edit-toggle button {
+  padding: 6px 10px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.rapid-edit-toggle button:hover {
+  background: #333;
+}
+
+.rapid-edit-toggle button.active {
+  background: #ff9800;
+  color: white;
+  border-color: #ff9800;
+}
+
+.delete-btn-rapid {
+  padding: 8px 16px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.delete-btn-rapid:hover {
+  background: #d32f2f;
+  transform: translateY(-1px);
+}
+
+/* ✅ List View Styles */
+.trackers-container.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tracker-card.list {
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.tracker-card.list:hover {
+  transform: none;
+}
+
+.tracker-card.list.is-full .list-row {
+  outline: 3px solid #f44336;
+  outline-offset: -3px;
+  box-shadow: 0 0 15px rgba(244, 67, 54, 0.5);
+}
+
+.list-header {
+  display: grid;
+  grid-template-columns: 50px 1fr 70px 70px 110px 120px 70px 70px 100px auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #aaa;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.list-header-cell {
+  text-align: center;
+}
+
+.list-header-cell:first-child {
+  text-align: left;
+}
+
+.list-header-cell:nth-child(2) {
+  text-align: left;
+}
+
+.list-row {
+  display: grid;
+  grid-template-columns: 50px 1fr 70px 70px 110px 120px 70px 70px 100px auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  background: #2a2a2a;
+  border-radius: 6px;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.list-row:hover {
+  background: #333;
+}
+
+.list-level {
+  font-weight: 600;
+  color: #4caf50;
+}
+
+.list-map {
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-channel {
+  padding: 4px 8px;
+  background: #333;
+  border-radius: 4px;
+  color: #aaa;
+  text-align: center;
+}
+
+.list-channel-select {
+  padding: 4px 8px;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.list-channel-select:focus {
+  outline: none;
+  border-color: #2196f3;
+}
+
+.list-full-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.list-full-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #f44336;
+}
+
+.list-full-checkbox input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.list-status-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.list-status-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 11px;
+  border: 2px solid;
+  flex-shrink: 0;
+}
+
+.list-status-text {
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.list-status-input {
+  width: 60px;
+  padding: 4px 8px;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #fff;
+  text-align: center;
+  font-size: 15px;
+}
+
+.list-status-input:focus {
+  outline: none;
+  border-color: #4caf50;
+}
+
+.list-countdown {
+  text-align: center;
+  font-size: 14px;
+}
+
+.list-countdown-edit {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+
+.list-countdown-input {
+  width: 60px;
+  padding: 4px 6px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #fff;
+  text-align: center;
+  font-size: 12px;
+}
+
+.list-countdown-input:focus {
+  outline: none;
+  border-color: #ff9800;
+}
+
+.list-countdown-btn {
+  padding: 4px 8px;
+  background: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.list-countdown-btn:hover:not(:disabled) {
+  background: #f57c00;
+}
+
+.list-countdown-btn:disabled {
+  background: #666;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.list-countdown-clear {
+  padding: 4px 6px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.list-countdown-clear:hover {
+  background: #d32f2f;
+}
+
+.countdown-text {
+  color: #ff9800;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.countdown-empty {
+  color: #555;
+}
+
+.list-time {
+  font-weight: 600;
+  font-size: 15px;
+  text-align: center;
+}
+
+.list-nickname {
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.list-commit-btn {
+  padding: 6px 12px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.list-commit-btn:hover {
+  background: #45a049;
+  transform: translateY(-1px);
+}
+
+.list-delete-btn {
+  padding: 6px 12px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.list-delete-btn:hover {
+  background: #d32f2f;
+  transform: translateY(-1px);
 }
 </style>

@@ -180,15 +180,21 @@
           </div>
 
           <div class="tracker-body">
-            <div class="tracker-channel">Ch{{ tracker.channelId }}</div>
+            <!-- Channel Display/Editor -->
+            <div v-if="editMode[tracker.id]" class="channel-selector">
+              <label>📡頻道:</label>
+              <select v-model.number="tracker.channelId" class="channel-select">
+                <option v-for="ch in 10" :key="ch" :value="ch">Ch{{ ch }}</option>
+              </select>
+            </div>
+            <div v-else class="tracker-channel">Ch{{ tracker.channelId }}</div>
 
             <!-- Full Status Checkbox -->
             <label class="full-checkbox">
               <input
                 type="checkbox"
                 v-model="tracker.isFull"
-                @change="updateFullStatus(tracker)"
-                :disabled="!canEdit"
+                :disabled="!canEdit || !editMode[tracker.id]"
               />
               <span>👥 {{ t('tracker.mapFull') }}</span>
             </label>
@@ -240,24 +246,22 @@
               </div>
 
             <!-- Inline Status Editor -->
-            <div class="status-editor">
+            <div v-if="editMode[tracker.id]" class="status-editor">
               <input
                 v-model.number="tracker.status"
                 type="number"
                 min="0"
                 max="5"
                 step="0.1"
-                @change="updateStatus(tracker)"
-                :disabled="!canEdit"
               />
             </div>
 
             <!-- Countdown Timer (for status < 1) -->
-            <div v-if="Number(tracker.status) < 1" class="countdown-section">
+            <div v-if="Number(tracker.status) < 1 && editMode[tracker.id]" class="countdown-section">
               <div v-if="tracker.countdownEndsAt" class="countdown-display">
                 ⏱️ {{ getCountdownText(tracker.countdownEndsAt) }}
               </div>
-              <div v-if="canEdit" class="countdown-controls">
+              <div class="countdown-controls">
                 <input
                   v-model="countdownMinutes[tracker.id]"
                   type="text"
@@ -305,6 +309,31 @@
                 </span>
               </div>
             </div>
+          </div>
+
+          <!-- Edit/Commit/Cancel Buttons -->
+          <div v-if="canEdit && !deleteMode" class="edit-actions">
+            <button
+              v-if="!editMode[tracker.id]"
+              @click="toggleEditMode(tracker)"
+              class="edit-btn"
+            >
+              ✏️ 編輯
+            </button>
+            <template v-else>
+              <button
+                @click="commitEdit(tracker)"
+                class="commit-btn"
+              >
+                ✓ 儲存
+              </button>
+              <button
+                @click="cancelEdit(tracker)"
+                class="cancel-btn"
+              >
+                ✕ 取消
+              </button>
+            </template>
           </div>
 
           <!-- Delete Button -->
@@ -451,6 +480,10 @@ const quickAddCountdown = ref('')
 
 // ✅ Countdown timers
 const countdownMinutes = ref({})
+
+// ✅ Edit mode for each tracker
+const editMode = ref({}) // { trackerId: true/false }
+const editCache = ref({}) // Store original values for cancel
 
 // Permissions
 const canEdit = computed(() => ['EDITOR', 'ADMIN'].includes(props.role))
@@ -997,6 +1030,81 @@ async function handleQuickAdd() {
     console.error('Failed to quick add tracker:', err)
     alert('Failed to add tracker: ' + (err.response?.data?.error || err.message))
   }
+}
+
+// ✅ Edit mode functions
+function toggleEditMode(tracker) {
+  if (!canEdit.value) return
+
+  const isEditing = editMode.value[tracker.id]
+
+  if (isEditing) {
+    // Exiting edit mode - just toggle off without saving
+    editMode.value[tracker.id] = false
+    delete editCache.value[tracker.id]
+  } else {
+    // Entering edit mode - cache current values
+    editMode.value[tracker.id] = true
+    editCache.value[tracker.id] = {
+      channelId: tracker.channelId,
+      status: tracker.status,
+      isFull: tracker.isFull,
+      countdownEndsAt: tracker.countdownEndsAt
+    }
+  }
+}
+
+async function commitEdit(tracker) {
+  if (!canEdit.value || !editMode.value[tracker.id]) return
+
+  try {
+    // Validate status range
+    const status = Number(tracker.status)
+    if (status < 0 || status > 5) {
+      alert('Status must be between 0 and 5')
+      return
+    }
+
+    // Prepare update data
+    const updateData = {
+      channelId: tracker.channelId,
+      status: status,
+      isFull: tracker.isFull
+    }
+
+    // ✅ Update via API
+    const response = await api.updateTracker(tracker.id, updateData)
+
+    console.log('[TrackerBoard] Tracker updated:', response.data)
+
+    // ✅ Emit to parent to update the tracker list
+    emit('update', response.data || tracker)
+
+    // Exit edit mode
+    editMode.value[tracker.id] = false
+    delete editCache.value[tracker.id]
+
+  } catch (err) {
+    console.error('Failed to update tracker:', err)
+    alert('Failed to update tracker: ' + (err.response?.data?.error || err.message))
+  }
+}
+
+function cancelEdit(tracker) {
+  if (!editMode.value[tracker.id]) return
+
+  const cached = editCache.value[tracker.id]
+  if (cached) {
+    // Restore original values
+    tracker.channelId = cached.channelId
+    tracker.status = cached.status
+    tracker.isFull = cached.isFull
+    tracker.countdownEndsAt = cached.countdownEndsAt
+  }
+
+  // Exit edit mode
+  editMode.value[tracker.id] = false
+  delete editCache.value[tracker.id]
 }
 
 // ✅ Actions
@@ -1951,5 +2059,91 @@ onBeforeUnmount(() => {
   height: 18px;
   cursor: pointer;
   accent-color: #4caf50;
+}
+
+/* ✅ Edit Mode Styles */
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  justify-content: center;
+}
+
+.edit-btn {
+  padding: 8px 16px;
+  background: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.edit-btn:hover {
+  background: #1976d2;
+  transform: translateY(-1px);
+}
+
+.commit-btn {
+  padding: 8px 16px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.commit-btn:hover {
+  background: #45a049;
+  transform: translateY(-1px);
+}
+
+.cancel-btn {
+  padding: 8px 16px;
+  background: #666;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.cancel-btn:hover {
+  background: #555;
+  transform: translateY(-1px);
+}
+
+.channel-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.channel-selector label {
+  color: #aaa;
+  font-weight: 600;
+}
+
+.channel-select {
+  padding: 6px 10px;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.channel-select:focus {
+  outline: none;
+  border-color: #2196f3;
 }
 </style>

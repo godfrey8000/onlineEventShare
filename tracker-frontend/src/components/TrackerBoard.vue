@@ -244,6 +244,37 @@
               />
             </div>
 
+            <!-- Countdown Timer (for status 0-1) -->
+            <div v-if="Number(tracker.status) >= 0 && Number(tracker.status) <= 1" class="countdown-section">
+              <div v-if="tracker.countdownEndsAt" class="countdown-display">
+                ⏱️ {{ getCountdownText(tracker.countdownEndsAt) }}
+              </div>
+              <div v-if="canEdit" class="countdown-controls">
+                <input
+                  v-model.number="countdownMinutes[tracker.id]"
+                  type="number"
+                  min="0"
+                  max="1440"
+                  placeholder="分鐘"
+                  class="countdown-input"
+                />
+                <button
+                  @click="setCountdown(tracker)"
+                  class="countdown-btn"
+                  :disabled="!countdownMinutes[tracker.id]"
+                >
+                  設定倒數
+                </button>
+                <button
+                  v-if="tracker.countdownEndsAt"
+                  @click="clearCountdown(tracker)"
+                  class="countdown-clear-btn"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
             <!-- Timestamps -->
             <div class="tracker-timestamps">
               <div class="timestamp-row">
@@ -410,6 +441,9 @@ const mapFilterExpanded = ref(true)
 // ✅ Quick Add
 const quickAddInput = ref('')
 
+// ✅ Countdown timers
+const countdownMinutes = ref({})
+
 // Permissions
 const canEdit = computed(() => ['EDITOR', 'ADMIN'].includes(props.role))
 const canDelete = computed(() => ['EDITOR', 'ADMIN'].includes(props.role))
@@ -457,10 +491,10 @@ const availableMaps = computed(() => {
 
 // ✅ Valid trackers (excluding old ones) - for showing total count
 const validTrackers = computed(() => {
-  const oneHourAgo = currentTime.value - (60 * 60 * 1000)
+  const eightHoursAgo = currentTime.value - (8 * 60 * 60 * 1000)
   return props.trackers.filter(t => {
     const updatedAt = new Date(t.updatedAt).getTime()
-    return updatedAt > oneHourAgo
+    return updatedAt > eightHoursAgo
   })
 })
 
@@ -747,6 +781,69 @@ function formatStatus(status) {
   return num % 1 === 0 ? num.toString() : num.toFixed(1)
 }
 
+// ✅ Countdown timer helpers
+function getCountdownText(countdownEndsAt) {
+  if (!countdownEndsAt) return ''
+
+  const now = currentTime.value
+  const endTime = new Date(countdownEndsAt).getTime()
+  const diff = endTime - now
+
+  if (diff <= 0) return '已完成'
+
+  const minutes = Math.floor(diff / 1000 / 60)
+  const seconds = Math.floor((diff / 1000) % 60)
+
+  if (minutes > 60) {
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return `${hours}h ${mins}m`
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`
+  }
+
+  return `${seconds}s`
+}
+
+async function setCountdown(tracker) {
+  if (!canEdit.value) return
+
+  const minutes = countdownMinutes.value[tracker.id]
+  if (!minutes || minutes <= 0) return
+
+  try {
+    const response = await api.updateTracker(tracker.id, {
+      countdownMinutes: minutes
+    })
+
+    console.log('[TrackerBoard] Countdown set:', response.data)
+    emit('update', response.data || tracker)
+
+    // Clear the input
+    countdownMinutes.value[tracker.id] = null
+  } catch (err) {
+    console.error('Failed to set countdown:', err)
+    alert('Failed to set countdown: ' + (err.response?.data?.error || err.message))
+  }
+}
+
+async function clearCountdown(tracker) {
+  if (!canEdit.value) return
+
+  try {
+    const response = await api.updateTracker(tracker.id, {
+      countdownMinutes: 0
+    })
+
+    console.log('[TrackerBoard] Countdown cleared:', response.data)
+    emit('update', response.data || tracker)
+  } catch (err) {
+    console.error('Failed to clear countdown:', err)
+    alert('Failed to clear countdown: ' + (err.response?.data?.error || err.message))
+  }
+}
 
 // ✅ Parse quick add input
 function parseQuickAddInput(input) {
@@ -899,6 +996,37 @@ async function deleteTracker(tracker) {
   } catch (err) {
     console.error('Failed to delete tracker:', err)
     alert('Failed to delete tracker')
+  }
+}
+
+// ✅ Check for expired countdowns and auto-update status
+watch(currentTime, () => {
+  props.trackers.forEach(tracker => {
+    if (tracker.countdownEndsAt && Number(tracker.status) >= 0 && Number(tracker.status) <= 1) {
+      const now = Date.now()
+      const endTime = new Date(tracker.countdownEndsAt).getTime()
+
+      if (now >= endTime && Number(tracker.status) < 1) {
+        // Countdown expired, update status to 1
+        autoUpdateStatusToOne(tracker)
+      }
+    }
+  })
+}, { immediate: false })
+
+async function autoUpdateStatusToOne(tracker) {
+  if (!canEdit.value) return
+
+  try {
+    const response = await api.updateTracker(tracker.id, {
+      status: 1,
+      countdownMinutes: 0 // Clear countdown
+    })
+
+    console.log('[TrackerBoard] Auto-updated status to 1 after countdown:', response.data)
+    emit('update', response.data || tracker)
+  } catch (err) {
+    console.error('Failed to auto-update status:', err)
   }
 }
 
@@ -1590,6 +1718,85 @@ onBeforeUnmount(() => {
 .simple-status-input:focus {
   outline: none;
   border-color: #4caf50;
+}
+
+/* ✅ Countdown Timer Styles */
+.countdown-section {
+  width: 100%;
+  background: #1e1e1e;
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 8px;
+}
+
+.countdown-display {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ff9800;
+  margin-bottom: 8px;
+}
+
+.countdown-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+}
+
+.countdown-input {
+  width: 70px;
+  padding: 6px 8px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #fff;
+  text-align: center;
+  font-size: 13px;
+}
+
+.countdown-input:focus {
+  outline: none;
+  border-color: #ff9800;
+}
+
+.countdown-btn {
+  padding: 6px 12px;
+  background: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.countdown-btn:hover:not(:disabled) {
+  background: #f57c00;
+}
+
+.countdown-btn:disabled {
+  background: #666;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.countdown-clear-btn {
+  padding: 6px 10px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.countdown-clear-btn:hover {
+  background: #d32f2f;
 }
 
 /* ✅ Full Status Checkboxes */

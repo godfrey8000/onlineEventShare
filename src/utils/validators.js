@@ -23,5 +23,6 @@ export const CreateTracker = z.object({
 export const UpdateTracker = z.object({
   status: z.number().min(0).max(5).optional(),
   nickname: z.string().min(1).optional(),
-  isFull: z.boolean().optional()
+  isFull: z.boolean().optional(),
+  countdownMinutes: z.number().min(0).max(1440).optional() // 0-1440 minutes (24 hours max)
 });

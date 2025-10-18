@@ -68,9 +68,23 @@ router.patch('/trackers/:id', authRequired, authorizeRole('EDITOR', 'ADMIN'), as
   if (!parsed.success) return res.status(400).json(parsed.error);
 
   try {
+    const data = { ...parsed.data };
+
+    // ✅ Handle countdown timer: convert minutes to timestamp
+    if (typeof data.countdownMinutes === 'number') {
+      if (data.countdownMinutes > 0) {
+        // Set countdown end time
+        data.countdownEndsAt = new Date(Date.now() + data.countdownMinutes * 60 * 1000);
+      } else {
+        // Clear countdown
+        data.countdownEndsAt = null;
+      }
+      delete data.countdownMinutes; // Remove from data, not a DB field
+    }
+
     const tracker = await prisma.tracker.update({
       where: { id },
-      data: parsed.data,
+      data,
       include: { episode: true, map: true, user: true }
     });
 

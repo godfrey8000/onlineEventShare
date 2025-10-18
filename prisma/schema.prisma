@@ -85,6 +85,7 @@ model Tracker {
   status     Decimal    @default(0)
   nickname   String?
   isFull     Boolean    @default(false)
+  countdownEndsAt DateTime?  // Timestamp when countdown ends and status becomes 1
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 

@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

@@ -144,6 +144,14 @@
           @keyup.enter="handleQuickAdd"
           :title="'Format: [Level][Channel][Status]\nLv1-9: 721.5 (Lv7, Ch2, 1.5)\nLv10-99: 6621.7 (Lv66, Ch2, 1.7)\nLv100+: 10523 (Lv105, Ch2, 3)'"
         />
+        <input
+          v-model="quickAddCountdown"
+          type="text"
+          placeholder="⏱️ 480 or 53000"
+          class="quick-add-countdown-input"
+          @keyup.enter="handleQuickAdd"
+          :title="'Countdown (for status < 1): Plain minutes (480) or hhmmss (53000 = 5h30m)'"
+        />
         <button @click="handleQuickAdd" class="quick-add-btn" :disabled="!quickAddInput">
           {{ t('tracker.add') }}
         </button>
@@ -244,19 +252,18 @@
               />
             </div>
 
-            <!-- Countdown Timer (for status 0-1) -->
-            <div v-if="Number(tracker.status) >= 0 && Number(tracker.status) <= 1" class="countdown-section">
+            <!-- Countdown Timer (for status < 1) -->
+            <div v-if="Number(tracker.status) < 1" class="countdown-section">
               <div v-if="tracker.countdownEndsAt" class="countdown-display">
                 ⏱️ {{ getCountdownText(tracker.countdownEndsAt) }}
               </div>
               <div v-if="canEdit" class="countdown-controls">
                 <input
-                  v-model.number="countdownMinutes[tracker.id]"
-                  type="number"
-                  min="0"
-                  max="1440"
-                  placeholder="分鐘"
+                  v-model="countdownMinutes[tracker.id]"
+                  type="text"
+                  placeholder="480 or 53000"
                   class="countdown-input"
+                  title="Enter minutes (480) or hhmmss (53000 = 5h30m)"
                 />
                 <button
                   @click="setCountdown(tracker)"
@@ -440,6 +447,7 @@ const mapFilterExpanded = ref(true)
 
 // ✅ Quick Add
 const quickAddInput = ref('')
+const quickAddCountdown = ref('')
 
 // ✅ Countdown timers
 const countdownMinutes = ref({})
@@ -781,6 +789,35 @@ function formatStatus(status) {
   return num % 1 === 0 ? num.toString() : num.toFixed(1)
 }
 
+// ✅ Parse time input - supports multiple formats:
+// - Plain minutes: 480 -> 480 minutes
+// - hhmmss format: 53000 -> 5h 30m 0s, 64000 -> 6h 40m 0s, 12030 -> 1h 20m 30s
+function parseTimeInput(input) {
+  if (!input) return 0
+
+  const str = String(input).trim()
+
+  // Check if it's plain minutes (less than 4 digits or no pattern match)
+  if (str.length <= 3) {
+    return parseInt(str, 10) || 0
+  }
+
+  // Try hhmmss format (4-6 digits)
+  // Examples: 53000 = 05:30:00, 64000 = 06:40:00, 12030 = 01:20:30
+  const padded = str.padStart(6, '0') // Ensure 6 digits
+  const hours = parseInt(padded.slice(0, 2), 10)
+  const minutes = parseInt(padded.slice(2, 4), 10)
+  const seconds = parseInt(padded.slice(4, 6), 10)
+
+  // Validate ranges
+  if (minutes >= 60 || seconds >= 60) {
+    return null // Invalid format
+  }
+
+  // Convert to total minutes (including fractional minutes from seconds)
+  return hours * 60 + minutes + (seconds / 60)
+}
+
 // ✅ Countdown timer helpers
 function getCountdownText(countdownEndsAt) {
   if (!countdownEndsAt) return ''
@@ -810,8 +847,14 @@ function getCountdownText(countdownEndsAt) {
 async function setCountdown(tracker) {
   if (!canEdit.value) return
 
-  const minutes = countdownMinutes.value[tracker.id]
-  if (!minutes || minutes <= 0) return
+  const input = countdownMinutes.value[tracker.id]
+  if (!input) return
+
+  const minutes = parseTimeInput(input)
+  if (minutes === null || minutes <= 0) {
+    alert('Invalid time format. Use:\n- Plain minutes: 480\n- hhmmss: 53000 (5h 30m), 64000 (6h 40m)')
+    return
+  }
 
   try {
     const response = await api.updateTracker(tracker.id, {
@@ -930,8 +973,25 @@ async function handleQuickAdd() {
     // Emit to parent to add to the list
     emit('update', response.data)
 
-    // Clear input
+    // ✅ If countdown is set and status < 1, set the countdown
+    if (quickAddCountdown.value && status < 1) {
+      const countdownMinutes = parseTimeInput(quickAddCountdown.value)
+      if (countdownMinutes !== null && countdownMinutes > 0) {
+        try {
+          const countdownResponse = await api.updateTracker(response.data.id, {
+            countdownMinutes: countdownMinutes
+          })
+          console.log('[TrackerBoard] Countdown set for quick-added tracker:', countdownResponse.data)
+          emit('update', countdownResponse.data)
+        } catch (err) {
+          console.error('Failed to set countdown for quick-added tracker:', err)
+        }
+      }
+    }
+
+    // Clear inputs
     quickAddInput.value = ''
+    quickAddCountdown.value = ''
 
   } catch (err) {
     console.error('Failed to quick add tracker:', err)
@@ -1311,6 +1371,26 @@ onBeforeUnmount(() => {
 }
 
 .quick-add-input::placeholder {
+  color: #666;
+}
+
+.quick-add-countdown-input {
+  width: 120px;
+  padding: 6px 12px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.quick-add-countdown-input:focus {
+  outline: none;
+  border-color: #ff9800;
+}
+
+.quick-add-countdown-input::placeholder {
   color: #666;
 }
 

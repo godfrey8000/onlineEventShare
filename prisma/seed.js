@@ -118,7 +118,16 @@ async function main() {
     }
   })
 
-  console.log('✅ Episodes created:', ep1.name, ep2.name, ep3.name, ep4.name, ep5.name, ep6.name, ep7.name, ep8.name, ep9.name, ep10.name, ep11.name)
+    const ep12 = await prisma.episode.upsert({
+    where: { episodeId: 12 },
+    update: {},
+    create: {
+      episodeId: 12,
+      name: 'LEVEL 90-93 地圖'
+    }
+  })
+
+  console.log('✅ Episodes created:', ep1.name, ep2.name, ep3.name, ep4.name, ep5.name, ep6.name, ep7.name, ep8.name, ep9.name, ep10.name, ep11.name, ep12.name)
 
   // Create Maps for Episode 1
   await prisma.map.createMany({
@@ -240,6 +249,17 @@ async function main() {
       { name: '貝拉伊森林', level: 87, episodeNumber: 11 },
       { name: '潔拉哈', level: 88, episodeNumber: 11},
       { name: '世伊魯森林', level: 89, episodeNumber: 11 }
+    ],
+    skipDuplicates: true
+  })
+
+    // Create Maps for Episode 12
+  await prisma.map.createMany({
+    data: [
+      { name: '沿岸要塞', level: 90, episodeNumber: 12 },
+      { name: '丁格巴希地區', level: 91, episodeNumber: 12 },
+      { name: '大地要塞貯藏區域', level: 92, episodeNumber: 12 },
+      { name: '大地要塞決戰地', level: 93, episodeNumber: 12}
     ],
     skipDuplicates: true
   })

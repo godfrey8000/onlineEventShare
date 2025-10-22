@@ -145,10 +145,10 @@
         <input
           v-model="quickAddInput"
           type="text"
-          placeholder="e.g. 721.5, 6622, 10523"
+          placeholder="e.g. 721.5, 68141, 10523"
           class="quick-add-input"
           @keyup.enter="handleQuickAdd"
-          :title="'Format: [Level][Channel][Status]\nLv1-9: 721.5 (Lv7, Ch2, 1.5)\nLv10-99: 6621.7 (Lv66, Ch2, 1.7)\nLv100+: 10523 (Lv105, Ch2, 3)'"
+          :title="'Format: [Level][Channel][Status]\nSingle-digit channel: 721.5 (Lv7, Ch2, 1.5)\nDouble-digit channel: 68141 (Lv68, Ch14, 1)\nHigh level: 10523 (Lv105, Ch2, 3)'"
         />
         <input
           v-model="quickAddCountdown"
@@ -204,7 +204,7 @@
             <div v-if="editMode[tracker.id] || rapidEditMode" class="channel-selector">
               <label>📡頻道:</label>
               <select v-model.number="tracker.channelId" class="channel-select">
-                <option v-for="ch in 10" :key="ch" :value="ch">Ch{{ ch }}</option>
+                <option v-for="ch in 99" :key="ch" :value="ch">Ch{{ ch }}</option>
               </select>
             </div>
             <div v-else class="tracker-channel">Ch{{ tracker.channelId }}</div>
@@ -466,7 +466,7 @@
             <!-- Channel Display/Editor -->
             <span v-if="!rapidEditMode" class="list-channel">Ch{{ tracker.channelId }}</span>
             <select v-else v-model.number="tracker.channelId" class="list-channel-select">
-              <option v-for="ch in 10" :key="ch" :value="ch">Ch{{ ch }}</option>
+              <option v-for="ch in 99" :key="ch" :value="ch">Ch{{ ch }}</option>
             </select>
 
             <!-- isFull Checkbox -->
@@ -1063,21 +1063,86 @@ function parseQuickAddInput(input) {
   // Extract the parts
   let level, channel, status
 
-  // Try to match the pattern
-  // For Lv 1-9: single digit + single digit + decimal (e.g., "721.5" = Lv7, Ch2, 1.5)
-  // For Lv 10-99: two digits + single digit + decimal (e.g., "6621.7" = Lv66, Ch2, 1.7)
-  // For Lv 100+: three+ digits + single digit + decimal (e.g., "10523" = Lv105, Ch2, 3)
+  // Strategy: Parse from the end
+  // Status is always the last part (1-5, with optional decimal)
+  // Channel is 1-2 digits before status (1-99)
+  // Level is everything remaining at the beginning (1-999)
 
-  const match = cleaned.match(/^(\d+)(\d)(\d+\.?\d*)$/)
+  // Match pattern: level (1+ digits) + channel (1-2 digits) + status (digit with optional decimal)
+  // We need to try both 1-digit and 2-digit channel interpretations
 
-  if (!match) {
+  // First, try to extract the status part (last digit(s) with optional decimal)
+  const statusMatch = cleaned.match(/^(.+?)(\d(?:\.\d+)?)$/)
+
+  if (!statusMatch) {
     return null
   }
 
-  const [, levelPart, channelDigit, statusPart] = match
+  const beforeStatus = statusMatch[1] // Everything before status
+  const statusPart = statusMatch[2]   // Status (e.g., "1", "1.5", "3")
+
+  // Now parse level and channel from beforeStatus
+  // Try both 1-digit and 2-digit channel interpretations
+  let levelPart, channelPart
+
+  if (beforeStatus.length >= 3) {
+    // Try 2-digit channel interpretation
+    const twoDigitChannel = beforeStatus.slice(-2)
+    const twoDigitLevel = beforeStatus.slice(0, -2)
+
+    // Try 1-digit channel interpretation
+    const oneDigitChannel = beforeStatus.slice(-1)
+    const oneDigitLevel = beforeStatus.slice(0, -1)
+
+    const twoDigitChannelNum = parseInt(twoDigitChannel, 10)
+    const twoDigitLevelNum = parseInt(twoDigitLevel, 10)
+    const oneDigitChannelNum = parseInt(oneDigitChannel, 10)
+    const oneDigitLevelNum = parseInt(oneDigitLevel, 10)
+
+    // Check if each interpretation is valid
+    const twoDigitValid = twoDigitChannelNum >= 10 && twoDigitChannelNum <= 99 &&
+                          twoDigitLevelNum >= 1 && twoDigitLevelNum <= 999
+    const oneDigitValid = oneDigitChannelNum >= 1 && oneDigitChannelNum <= 9 &&
+                          oneDigitLevelNum >= 1 && oneDigitLevelNum <= 999
+
+    // Prefer the interpretation where the level exists in our maps database
+    const twoDigitLevelExists = maps.value.some(m => m.level === twoDigitLevelNum)
+    const oneDigitLevelExists = maps.value.some(m => m.level === oneDigitLevelNum)
+
+    if (twoDigitValid && oneDigitValid) {
+      // Both are valid, prefer the one with existing map level
+      if (oneDigitLevelExists && !twoDigitLevelExists) {
+        // Prefer 1-digit channel interpretation
+        levelPart = oneDigitLevel
+        channelPart = oneDigitChannel
+      } else if (twoDigitLevelExists && !oneDigitLevelExists) {
+        // Prefer 2-digit channel interpretation
+        levelPart = twoDigitLevel
+        channelPart = twoDigitChannel
+      } else {
+        // Both or neither exist in maps - default to 1-digit channel (more common)
+        levelPart = oneDigitLevel
+        channelPart = oneDigitChannel
+      }
+    } else if (twoDigitValid) {
+      levelPart = twoDigitLevel
+      channelPart = twoDigitChannel
+    } else if (oneDigitValid) {
+      levelPart = oneDigitLevel
+      channelPart = oneDigitChannel
+    } else {
+      return null
+    }
+  } else if (beforeStatus.length === 2) {
+    // Only room for single-digit level and single-digit channel
+    levelPart = beforeStatus.slice(0, 1)
+    channelPart = beforeStatus.slice(1, 2)
+  } else {
+    return null
+  }
 
   level = parseInt(levelPart, 10)
-  channel = parseInt(channelDigit, 10)
+  channel = parseInt(channelPart, 10)
   status = parseFloat(statusPart)
 
   // Validate ranges
@@ -1085,8 +1150,8 @@ function parseQuickAddInput(input) {
     return { error: 'Level must be between 1 and 999' }
   }
 
-  if (channel < 1 || channel > 9) {
-    return { error: 'Channel must be between 1 and 9' }
+  if (channel < 1 || channel > 99) {
+    return { error: 'Channel must be between 1 and 99' }
   }
 
   if (status < 0 || status > 5) {
@@ -1105,7 +1170,7 @@ async function handleQuickAdd() {
   const parsed = parseQuickAddInput(quickAddInput.value)
 
   if (!parsed) {
-    alert('Invalid format. Examples:\n• Lv1-9: 721.5 (Lv7, Ch2, 1.5)\n• Lv10-99: 6621.7 (Lv66, Ch2, 1.7)\n• Lv100+: 10523 (Lv105, Ch2, 3)')
+    alert('Invalid format. Examples:\n• Single-digit channel: 721.5 (Lv7, Ch2, 1.5)\n• Double-digit channel: 68141 (Lv68, Ch14, 1)\n• High level: 10523 (Lv105, Ch2, 3)')
     return
   }
 

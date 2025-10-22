@@ -21,6 +21,7 @@ export const CreateTracker = z.object({
 });
 
 export const UpdateTracker = z.object({
+  channelId: z.number().int().min(1).max(99).optional(),
   status: z.number().min(0).max(5).optional(),
   nickname: z.string().min(1).optional(),
   isFull: z.boolean().optional(),

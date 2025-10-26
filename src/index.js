@@ -11,6 +11,7 @@ import mapsRoutes from './routes/maps.routes.js';
 import chatRoutes from './routes/chat.routes.js';  // ✅ Add this
 import { createSocket } from './socket.js';
 import { scheduleHousekeeping, runHousekeeping } from './jobs/housekeeping.js';
+import { startCountdownChecker } from './jobs/countdownChecker.js';
 import { authRequired, authorizeRole } from './middleware/auth.js';
 
 const app = express();
@@ -108,6 +109,9 @@ server.listen(PORT, () => {
 
   // ✅ Initialize housekeeping jobs
   scheduleHousekeeping();
+
+  // ✅ Start countdown checker
+  startCountdownChecker(io);
 });
 
 // ✅ Graceful shutdown

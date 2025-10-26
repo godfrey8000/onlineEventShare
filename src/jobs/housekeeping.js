@@ -4,21 +4,21 @@ import cron from 'node-cron';
 const prisma = new PrismaClient();
 
 /**
- * Clean up tracker records older than 1 day
+ * Clean up tracker records with updatedAt older than 3 days
  */
 async function cleanupOldTrackers() {
   try {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
     const result = await prisma.tracker.deleteMany({
       where: {
-        createdAt: {
-          lt: oneDayAgo
+        updatedAt: {
+          lt: threeDaysAgo
         }
       }
     });
 
-    console.log(`[Housekeeping] Deleted ${result.count} tracker records older than 1 day`);
+    console.log(`[Housekeeping] Deleted ${result.count} tracker records with updatedAt older than 3 days`);
     return result.count;
   } catch (err) {
     console.error('[Housekeeping] Error cleaning up trackers:', err);

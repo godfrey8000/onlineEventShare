@@ -121,6 +121,7 @@
           <option value="status">Status</option>
           <option value="level">Level</option>
           <option value="nickname">Nickname</option>
+          <option value="countdown">Countdown</option>
           <option value="updatedAt">Last Updated</option>
           <option value="createdAt">Created</option>
         </select>
@@ -133,7 +134,7 @@
       <div v-if="canEdit" class="rapid-edit-toggle">
         <button
           :class="{ active: rapidEditMode }"
-          @click="rapidEditMode = !rapidEditMode"
+          @click="toggleRapidEditMode"
         >
           {{ rapidEditMode ? '✓ 快速編輯中' : '⚡ 快速編輯' }}
         </button>
@@ -156,7 +157,7 @@
           placeholder="⏱️ 480 or 53000"
           class="quick-add-countdown-input"
           @keyup.enter="handleQuickAdd"
-          :title="'Countdown (for status < 1): Plain minutes (480) or hhmmss (53000 = 5h30m)'"
+          :title="'Countdown time:\n• Phase < 1: future time (e.g., 480 = countdown for 8h)\n• Phase ≥ 1: past time (e.g., 10 = phase 1 started 10 minutes ago)\nFormat: Plain minutes (480) or hhmmss (53000 = 5h30m)'"
         />
         <button @click="handleQuickAdd" class="quick-add-btn" :disabled="!quickAddInput">
           {{ t('tracker.add') }}
@@ -276,25 +277,33 @@
               />
             </div>
 
-            <!-- Countdown Timer (for status < 1) - Always show if can edit -->
-            <div v-if="Number(tracker.status) < 1 && canEdit" class="countdown-section">
-              <div v-if="tracker.countdownEndsAt" class="countdown-display">
-                ⏱️ {{ getCountdownText(tracker.countdownEndsAt) }}
+            <!-- Countdown/Phase Time Display and Editor -->
+            <div v-if="tracker.countdownEndsAt || canEdit" :class="Number(tracker.status) >= 1 ? 'phase-one-section' : 'countdown-section'">
+              <!-- Display: Countdown for phase 0, Elapsed time for phase 1+ -->
+              <div v-if="tracker.countdownEndsAt" :class="Number(tracker.status) >= 1 ? 'phase-one-display' : 'countdown-display'">
+                <template v-if="Number(tracker.status) < 1">
+                  ⏱️ {{ getCountdownText(tracker.countdownEndsAt) }}
+                </template>
+                <template v-else>
+                  🕐 Phase 1: {{ getPhaseOneElapsedText(tracker.countdownEndsAt) }}
+                </template>
               </div>
-              <div class="countdown-controls">
+
+              <!-- Editor: Always show if can edit -->
+              <div v-if="canEdit" class="countdown-controls">
                 <input
                   v-model="countdownMinutes[tracker.id]"
                   type="text"
-                  placeholder="480 or 53000"
+                  :placeholder="Number(tracker.status) < 1 ? '480 or 53000' : 'e.g. 10 (10m ago)'"
                   class="countdown-input"
-                  title="Enter minutes (480) or hhmmss (53000 = 5h30m)"
+                  :title="Number(tracker.status) < 1 ? 'Enter minutes (480) or hhmmss (53000 = 5h30m) for countdown' : 'Enter minutes ago when phase 1 started'"
                 />
                 <button
                   @click="setCountdown(tracker)"
                   class="countdown-btn"
                   :disabled="!countdownMinutes[tracker.id]"
                 >
-                  設定倒數
+                  {{ Number(tracker.status) < 1 ? '設定倒數' : '設定時間' }}
                 </button>
                 <button
                   v-if="tracker.countdownEndsAt"
@@ -318,7 +327,7 @@
                   {{ getTimeAgo(tracker.updatedAt) }}
                 </span>
               </div>
-              <div class="timestamp-row">
+              <div v-if="!isUpdatedLongerThanOneDay(tracker.updatedAt)" class="timestamp-row">
                 <span class="timestamp-label">📅 {{ t('tracker.created') }}:</span>
                 <span
                   class="timestamp-value"
@@ -438,6 +447,7 @@
                 {{ getTimeAgo(tracker.updatedAt) }}
               </span>
               <span
+                v-if="!isUpdatedLongerThanOneDay(tracker.updatedAt)"
                 class="simple-time"
                 :title="`${t('tracker.created')}: ${formatFullTime(tracker.createdAt)}`"
                 :style="{ color: getTimestampColor(tracker.createdAt) }"
@@ -500,14 +510,14 @@
 
             <!-- Countdown Column -->
             <div class="list-countdown">
-              <!-- Show countdown controls in rapid edit mode for status < 1 -->
-              <div v-if="rapidEditMode && canEdit && Number(tracker.status) < 1" class="list-countdown-edit">
+              <!-- Show countdown controls in rapid edit mode (for all phases) -->
+              <div v-if="rapidEditMode && canEdit" class="list-countdown-edit">
                 <input
                   v-model="countdownMinutes[tracker.id]"
                   type="text"
-                  placeholder="480"
+                  :placeholder="getCountdownPlaceholder(tracker)"
                   class="list-countdown-input"
-                  title="Enter minutes (480) or hhmmss (53000 = 5h30m)"
+                  :title="Number(tracker.status) < 1 ? 'Enter minutes (480) or hhmmss (53000 = 5h30m)' : 'Enter minutes ago when phase 1 started'"
                 />
                 <button
                   @click="setCountdown(tracker)"
@@ -524,9 +534,13 @@
                   ✕
                 </button>
               </div>
-              <!-- Display countdown when not in rapid edit mode -->
+              <!-- Display countdown when not in rapid edit mode for status < 1 -->
               <span v-else-if="tracker.countdownEndsAt && Number(tracker.status) < 1" class="countdown-text">
                 ⏱️ {{ getCountdownText(tracker.countdownEndsAt) }}
+              </span>
+              <!-- Display phase one elapsed time for status >= 1 -->
+              <span v-else-if="tracker.countdownEndsAt && Number(tracker.status) >= 1" class="phase-one-text">
+                🕐 {{ getPhaseOneElapsedText(tracker.countdownEndsAt) }}
               </span>
               <span v-else class="countdown-empty">-</span>
             </div>
@@ -534,9 +548,10 @@
             <span class="list-time" :style="{ color: getTimestampColor(tracker.updatedAt) }">
               {{ getTimeAgo(tracker.updatedAt) }}
             </span>
-            <span class="list-time" :style="{ color: getTimestampColor(tracker.createdAt) }">
+            <span v-if="!isUpdatedLongerThanOneDay(tracker.updatedAt)" class="list-time" :style="{ color: getTimestampColor(tracker.createdAt) }">
               {{ getTimeAgo(tracker.createdAt) }}
             </span>
+            <span v-else class="list-time">-</span>
             <span class="list-nickname">{{ getUserNickname(tracker) }}</span>
 
             <!-- Rapid Edit Buttons -->
@@ -562,7 +577,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '../services/api'
 
@@ -618,6 +633,8 @@ const countdownMinutes = ref({})
 const editMode = ref({}) // { trackerId: true/false }
 const editCache = ref({}) // Store original values for cancel
 const rapidEditMode = ref(false) // Rapid edit mode - all trackers editable at once
+const sortCache = ref({}) // Cache original sort values during rapid edit mode
+const rapidEditCache = ref({}) // Cache original tracker values during rapid edit mode
 
 // Permissions
 const canEdit = computed(() => ['EDITOR', 'ADMIN'].includes(props.role))
@@ -755,40 +772,52 @@ function clearAllFilters() {
 // ✅ Sorted trackers
 const sortedTrackers = computed(() => {
   const sorted = [...filteredTrackers.value]
-  
+
   sorted.sort((a, b) => {
     let aVal, bVal
-    
+
+    // ✅ Use cached values during rapid edit mode to prevent re-sorting
+    const aCache = rapidEditMode.value ? sortCache.value[a.id] : null
+    const bCache = rapidEditMode.value ? sortCache.value[b.id] : null
+
     switch (sortBy.value) {
       case 'status':
-        aVal = Number(a.status)
-        bVal = Number(b.status)
+        aVal = aCache ? Number(aCache.status) : Number(a.status)
+        bVal = bCache ? Number(bCache.status) : Number(b.status)
         break
       case 'level':
-        aVal = a.level || 0
-        bVal = b.level || 0
+        aVal = aCache ? (aCache.level || 0) : (a.level || 0)
+        bVal = bCache ? (bCache.level || 0) : (b.level || 0)
         break
       case 'nickname':
-        aVal = a.nickname || ''
-        bVal = b.nickname || ''
-        return sortOrder.value === 'asc' 
+        aVal = aCache ? (aCache.nickname || '') : (a.nickname || '')
+        bVal = bCache ? (bCache.nickname || '') : (b.nickname || '')
+        return sortOrder.value === 'asc'
           ? aVal.localeCompare(bVal)
           : bVal.localeCompare(aVal)
+      case 'countdown':
+        // Sort by countdown time (smallest/closest to expire first)
+        // Trackers without countdown go to the end
+        const aCountdown = aCache ? aCache.countdownEndsAt : a.countdownEndsAt
+        const bCountdown = bCache ? bCache.countdownEndsAt : b.countdownEndsAt
+        aVal = aCountdown ? new Date(aCountdown).getTime() : Infinity
+        bVal = bCountdown ? new Date(bCountdown).getTime() : Infinity
+        break
       case 'updatedAt':
-        aVal = new Date(a.updatedAt)
-        bVal = new Date(b.updatedAt)
+        aVal = aCache ? new Date(aCache.updatedAt) : new Date(a.updatedAt)
+        bVal = bCache ? new Date(bCache.updatedAt) : new Date(b.updatedAt)
         break
       case 'createdAt':
-        aVal = new Date(a.createdAt)
-        bVal = new Date(b.createdAt)
+        aVal = aCache ? new Date(aCache.createdAt) : new Date(a.createdAt)
+        bVal = bCache ? new Date(bCache.createdAt) : new Date(b.createdAt)
         break
       default:
         return 0
     }
-    
+
     return sortOrder.value === 'asc' ? aVal - bVal : bVal - aVal
   })
-  
+
   return sorted
 })
 
@@ -951,6 +980,13 @@ function formatFullTime(timestamp) {
   })
 }
 
+// ✅ Helper: Check if updated time is longer than 1 day
+function isUpdatedLongerThanOneDay(updatedAt) {
+  const diff = currentTime.value - new Date(updatedAt).getTime()
+  const hours = Math.floor(diff / 1000 / 60 / 60)
+  return hours >= 24
+}
+
 function formatStatus(status) {
   const num = Number(status)
   return num % 1 === 0 ? num.toString() : num.toFixed(1)
@@ -1011,6 +1047,47 @@ function getCountdownText(countdownEndsAt) {
   return `${seconds}s`
 }
 
+// Get time since phase 1 started (post-cooldown time)
+// For phase 1+, countdownEndsAt represents when phase 1 started
+function getPhaseOneElapsedText(countdownEndsAt) {
+  if (!countdownEndsAt) return ''
+
+  const now = currentTime.value
+  const phaseOneStartTime = new Date(countdownEndsAt).getTime()
+  const diff = now - phaseOneStartTime
+
+  if (diff < 0) return '' // countdownEndsAt is in the future (shouldn't happen for phase 1+)
+
+  const minutes = Math.floor(diff / 1000 / 60)
+
+  if (minutes < 1) {
+    return 'Just now'
+  }
+
+  if (minutes < 60) {
+    return `CD+${minutes}m`
+  }
+
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return `CD+${hours}h ${mins}m`
+}
+
+// Get placeholder text for countdown input showing current value
+function getCountdownPlaceholder(tracker) {
+  if (tracker.countdownEndsAt) {
+    if (Number(tracker.status) < 1) {
+      // Phase 0: show countdown time
+      return getCountdownText(tracker.countdownEndsAt)
+    } else {
+      // Phase 1+: show elapsed time
+      return getPhaseOneElapsedText(tracker.countdownEndsAt)
+    }
+  }
+  // No countdown set, show default placeholder
+  return Number(tracker.status) < 1 ? '480' : '10'
+}
+
 async function setCountdown(tracker) {
   if (!canEdit.value) return
 
@@ -1024,12 +1101,52 @@ async function setCountdown(tracker) {
   }
 
   try {
-    const response = await api.updateTracker(tracker.id, {
+    // ✅ In rapid edit mode, include all edited fields (status, channel, isFull)
+    const updateData = {
       countdownMinutes: minutes
-    })
+    }
+
+    // ✅ Validate and include edited fields if in rapid edit mode
+    if (rapidEditMode.value) {
+      const status = Number(tracker.status)
+      if (status < 0 || status > 5) {
+        alert('Status must be between 0 and 5')
+        return
+      }
+
+      updateData.status = status
+      updateData.channelId = tracker.channelId
+      updateData.isFull = tracker.isFull
+    }
+
+    const response = await api.updateTracker(tracker.id, updateData)
 
     console.log('[TrackerBoard] Countdown set:', response.data)
     emit('update', response.data || tracker)
+
+    // ✅ Update caches if in rapid edit mode
+    if (rapidEditMode.value) {
+      // Update sort cache with committed values
+      if (sortCache.value[tracker.id]) {
+        sortCache.value[tracker.id] = {
+          status: tracker.status,
+          level: tracker.level,
+          nickname: tracker.nickname,
+          updatedAt: tracker.updatedAt,
+          createdAt: tracker.createdAt,
+          countdownEndsAt: tracker.countdownEndsAt
+        }
+      }
+
+      // Update rapid edit cache so it won't be reverted on exit
+      if (rapidEditCache.value[tracker.id]) {
+        rapidEditCache.value[tracker.id] = {
+          channelId: tracker.channelId,
+          status: tracker.status,
+          isFull: tracker.isFull
+        }
+      }
+    }
 
     // Clear the input
     countdownMinutes.value[tracker.id] = null
@@ -1205,8 +1322,10 @@ async function handleQuickAdd() {
     // Emit to parent to add to the list
     emit('update', response.data)
 
-    // ✅ If countdown is set and status < 1, set the countdown
-    if (quickAddCountdown.value && status < 1) {
+    // ✅ If countdown is set, set it for any phase
+    // For phase < 1: countdown = future time (now + minutes)
+    // For phase >= 1: countdown = past time (now - minutes, when phase 1 started)
+    if (quickAddCountdown.value) {
       const countdownMinutes = parseTimeInput(quickAddCountdown.value)
       if (countdownMinutes !== null && countdownMinutes > 0) {
         try {
@@ -1272,6 +1391,17 @@ async function commitEdit(tracker) {
       isFull: tracker.isFull
     }
 
+    // ✅ Include countdown minutes if entered but not yet committed
+    const input = countdownMinutes.value[tracker.id]
+    if (input) {
+      const minutes = parseTimeInput(input)
+      if (minutes !== null && minutes > 0) {
+        updateData.countdownMinutes = minutes
+        // Clear the input after including it
+        countdownMinutes.value[tracker.id] = null
+      }
+    }
+
     // ✅ Update via API
     const response = await api.updateTracker(tracker.id, updateData)
 
@@ -1279,6 +1409,30 @@ async function commitEdit(tracker) {
 
     // ✅ Emit to parent to update the tracker list
     emit('update', response.data || tracker)
+
+    // ✅ Update caches if in rapid edit mode
+    if (rapidEditMode.value) {
+      // Update sort cache with committed values
+      if (sortCache.value[tracker.id]) {
+        sortCache.value[tracker.id] = {
+          status: tracker.status,
+          level: tracker.level,
+          nickname: tracker.nickname,
+          updatedAt: tracker.updatedAt,
+          createdAt: tracker.createdAt,
+          countdownEndsAt: tracker.countdownEndsAt
+        }
+      }
+
+      // Update rapid edit cache so it won't be reverted on exit
+      if (rapidEditCache.value[tracker.id]) {
+        rapidEditCache.value[tracker.id] = {
+          channelId: tracker.channelId,
+          status: tracker.status,
+          isFull: tracker.isFull
+        }
+      }
+    }
 
     // Exit edit mode
     editMode.value[tracker.id] = false
@@ -1305,6 +1459,54 @@ function cancelEdit(tracker) {
   // Exit edit mode
   editMode.value[tracker.id] = false
   delete editCache.value[tracker.id]
+}
+
+// ✅ Toggle rapid edit mode with caching
+function toggleRapidEditMode() {
+  if (rapidEditMode.value) {
+    // Exiting rapid edit mode - restore uncommitted changes
+    filteredTrackers.value.forEach(tracker => {
+      const cached = rapidEditCache.value[tracker.id]
+      if (cached) {
+        tracker.channelId = cached.channelId
+        tracker.status = cached.status
+        tracker.isFull = cached.isFull
+        // Don't restore countdownEndsAt since it's managed by backend
+      }
+    })
+
+    // Clear caches and countdown inputs
+    sortCache.value = {}
+    rapidEditCache.value = {}
+    countdownMinutes.value = {}
+
+    rapidEditMode.value = false
+  } else {
+    // Entering rapid edit mode - cache current values
+    rapidEditMode.value = true
+
+    sortCache.value = {}
+    rapidEditCache.value = {}
+
+    filteredTrackers.value.forEach(tracker => {
+      // Cache for sorting (prevents re-sorting during edit)
+      sortCache.value[tracker.id] = {
+        status: tracker.status,
+        level: tracker.level,
+        nickname: tracker.nickname,
+        updatedAt: tracker.updatedAt,
+        createdAt: tracker.createdAt,
+        countdownEndsAt: tracker.countdownEndsAt
+      }
+
+      // Cache for restoring uncommitted changes
+      rapidEditCache.value[tracker.id] = {
+        channelId: tracker.channelId,
+        status: tracker.status,
+        isFull: tracker.isFull
+      }
+    })
+  }
 }
 
 // ✅ Actions
@@ -1367,36 +1569,9 @@ async function deleteTracker(tracker) {
   }
 }
 
-// ✅ Check for expired countdowns and auto-update status
-watch(currentTime, () => {
-  props.trackers.forEach(tracker => {
-    if (tracker.countdownEndsAt && Number(tracker.status) >= 0 && Number(tracker.status) <= 1) {
-      const now = Date.now()
-      const endTime = new Date(tracker.countdownEndsAt).getTime()
-
-      if (now >= endTime && Number(tracker.status) < 1) {
-        // Countdown expired, update status to 1
-        autoUpdateStatusToOne(tracker)
-      }
-    }
-  })
-}, { immediate: false })
-
-async function autoUpdateStatusToOne(tracker) {
-  if (!canEdit.value) return
-
-  try {
-    const response = await api.updateTracker(tracker.id, {
-      status: 1,
-      countdownMinutes: 0 // Clear countdown
-    })
-
-    console.log('[TrackerBoard] Auto-updated status to 1 after countdown:', response.data)
-    emit('update', response.data || tracker)
-  } catch (err) {
-    console.error('Failed to auto-update status:', err)
-  }
-}
+// ✅ Countdown expiration is now handled by backend countdown checker job (every 10s)
+// The backend job updates status to 1 and keeps countdownEndsAt as phase 1 start time
+// All clients receive updates via Socket.io, so no need for frontend auto-update
 
 // ✅ Load data on mount
 onMounted(() => {
@@ -2156,6 +2331,23 @@ onBeforeUnmount(() => {
   margin-bottom: 8px;
 }
 
+/* ✅ Phase One Elapsed Time Styles */
+.phase-one-section {
+  width: 100%;
+  background: #1a2a1a;
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 8px;
+  border: 1px solid #4caf50;
+}
+
+.phase-one-display {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #4caf50;
+}
+
 .countdown-controls {
   display: flex;
   gap: 6px;
@@ -2453,7 +2645,7 @@ onBeforeUnmount(() => {
 
 .list-header {
   display: grid;
-  grid-template-columns: 50px 1fr 70px 70px 110px 120px 70px 70px 100px auto;
+  grid-template-columns: 50px 1fr 60px 70px 110px 140px 70px 70px 100px 100px;
   gap: 12px;
   align-items: center;
   padding: 10px 16px;
@@ -2483,7 +2675,7 @@ onBeforeUnmount(() => {
 
 .list-row {
   display: grid;
-  grid-template-columns: 50px 1fr 70px 70px 110px 120px 70px 70px 100px auto;
+  grid-template-columns: 50px 1fr 60px 70px 110px 140px 70px 70px 100px 100px;
   gap: 12px;
   align-items: center;
   padding: 10px 16px;
@@ -2608,7 +2800,7 @@ onBeforeUnmount(() => {
 }
 
 .list-countdown-input {
-  width: 60px;
+  width: 55px;
   padding: 4px 6px;
   background: #2a2a2a;
   border: 1px solid #444;
@@ -2662,6 +2854,12 @@ onBeforeUnmount(() => {
 
 .countdown-text {
   color: #ff9800;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.phase-one-text {
+  color: #4caf50;
   font-weight: 600;
   font-size: 14px;
 }

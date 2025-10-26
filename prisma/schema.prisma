@@ -1,4 +1,3 @@
-// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,93 +7,87 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  VIEWER
-  CHATTER
-  EDITOR
-  ADMIN
-}
-
 model Map {
-  id        Int      @id @default(autoincrement())
-  name      String
-  level     Int
-  episode        Episode  @relation(fields: [episodeNumber], references: [episodeId])  // ✅ Relation field
-  episodeNumber  Int      // ✅ Scalar field (foreign key)
-  trackers  Tracker[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ✅ new relation to favorites
-  favorites MapFavorite[]
+  id            Int           @id @default(autoincrement())
+  name          String
+  level         Int
+  episodeNumber Int
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  episode       Episode       @relation(fields: [episodeNumber], references: [episodeId])
+  favorites     MapFavorite[]
+  trackers      Tracker[]
 }
 
 model ChatMessage {
   id        Int      @id @default(autoincrement())
   userId    Int
-  user      User     @relation(fields: [userId], references: [id])
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  username  String    @unique
+  id        Int           @id @default(autoincrement())
+  username  String        @unique
   password  String
   nickname  String?
-  role      Role      @default(VIEWER)
-  createdAt DateTime  @default(now())
-  trackers  Tracker[]
+  role      Role          @default(VIEWER)
+  createdAt DateTime      @default(now())
+  messages  ChatMessage[]
   favorites MapFavorite[]
-  messages  ChatMessage[]   
+  trackers  Tracker[]
 }
-
 
 model MapFavorite {
   id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id])
   userId    Int
-  map       Map      @relation(fields: [mapId], references: [id])
   mapId     Int
   createdAt DateTime @default(now())
+  map       Map      @relation(fields: [mapId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 
-  @@unique([userId, mapId]) // no duplicate favorite per user
+  @@unique([userId, mapId])
 }
-
-
 
 model Episode {
-  id        Int         @id @default(autoincrement())
-  episodeId  Int         @unique
+  id        Int       @id @default(autoincrement())
+  episodeId Int       @unique
   name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   maps      Map[]
   trackers  Tracker[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
 }
 
-
 model Tracker {
-  id         Int        @id @default(autoincrement())
-  episodeNumber  Int
-  mapId      Int
-  userId     Int?
-  channelId  Int
-  level      Int?
-  status     Decimal    @default(0)
-  nickname   String?
-  isFull     Boolean    @default(false)
-  countdownEndsAt DateTime?  // Timestamp when countdown ends and status becomes 1
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-
-  map       Map         @relation(fields: [mapId], references: [id])
-  episode   Episode     @relation(fields: [episodeNumber], references: [episodeId])
-  user      User?       @relation(fields: [userId], references: [id])
+  id              Int       @id @default(autoincrement())
+  episodeNumber   Int
+  mapId           Int
+  userId          Int?
+  channelId       Int
+  level           Int?
+  status          Decimal   @default(0)
+  nickname        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  countdownEndsAt DateTime?  // For phase 0: countdown end time (future); For phase 1+: when phase 1 started (past)
+  isFull          Boolean   @default(false)
+  reminderEnabled Boolean   @default(false) // Voice reminder when phase changes from 0 to 1
+  episode         Episode   @relation(fields: [episodeNumber], references: [episodeId])
+  map             Map       @relation(fields: [mapId], references: [id])
+  user            User?     @relation(fields: [userId], references: [id])
 }
 
 model Channel {
   id   Int    @id @default(autoincrement())
   name String
+}
+
+enum Role {
+  VIEWER
+  CHATTER
+  EDITOR
+  ADMIN
 }

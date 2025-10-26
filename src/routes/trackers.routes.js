@@ -73,8 +73,24 @@ router.patch('/trackers/:id', authRequired, authorizeRole('EDITOR', 'ADMIN'), as
     // ✅ Handle countdown timer: convert minutes to timestamp
     if (typeof data.countdownMinutes === 'number') {
       if (data.countdownMinutes > 0) {
-        // Set countdown end time
-        data.countdownEndsAt = new Date(Date.now() + data.countdownMinutes * 60 * 1000);
+        // Check if status is being updated in this request, otherwise get from DB
+        let statusToCheck;
+        if (data.status !== undefined) {
+          // Use the updated status from this request
+          statusToCheck = Number(data.status);
+        } else {
+          // Get current tracker status from DB
+          const currentTracker = await prisma.tracker.findUnique({ where: { id } });
+          statusToCheck = currentTracker ? Number(currentTracker.status) : 0;
+        }
+
+        if (statusToCheck < 1) {
+          // Phase 0: Set countdown end time (future)
+          data.countdownEndsAt = new Date(Date.now() + data.countdownMinutes * 60 * 1000);
+        } else {
+          // Phase 1+: Set as past time (when phase 1 started)
+          data.countdownEndsAt = new Date(Date.now() - data.countdownMinutes * 60 * 1000);
+        }
       } else {
         // Clear countdown
         data.countdownEndsAt = null;

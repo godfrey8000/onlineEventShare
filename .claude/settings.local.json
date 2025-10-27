@@ -9,7 +9,9 @@
       "Bash(git push:*)",
       "Bash(find:*)",
       "Bash(git checkout:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(psql:*)",
+      "Bash(node check-schema.js:*)"
     ],
     "deny": [],
     "ask": []

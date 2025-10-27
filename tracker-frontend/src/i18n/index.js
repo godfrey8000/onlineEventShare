@@ -73,7 +73,13 @@ const messages = {
       full: 'Full',
       countdown: 'Countdown',
       user: 'User',
-      actions: 'Actions'
+      actions: 'Actions',
+      phase: 'Phase'
+    },
+    reminder: {
+      level: 'Level',
+      channel: 'Channel',
+      phase: 'Phase'
     },
     chat: {
       title: 'Chat Room',
@@ -172,7 +178,13 @@ const messages = {
       full: '滿',
       countdown: '倒數',
       user: '使用者',
-      actions: '操作'
+      actions: '操作',
+      phase: '階段'
+    },
+    reminder: {
+      level: '等級',
+      channel: '頻道',
+      phase: '階段'
     },
     chat: {
       title: '聊天室',
@@ -271,7 +283,13 @@ const messages = {
       full: '上限',
       countdown: 'カウントダウン',
       user: 'ユーザー',
-      actions: 'アクション'
+      actions: 'アクション',
+      phase: 'フェーズ'
+    },
+    reminder: {
+      level: 'レベル',
+      channel: 'チャンネル',
+      phase: 'フェーズ'
     },
     chat: {
       title: 'チャットルーム',

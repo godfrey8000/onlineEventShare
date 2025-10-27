@@ -103,6 +103,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api, setAuthToken, initAuth } from './services/api'
 import {
   connectSocket,
@@ -126,6 +127,9 @@ import UserProfile from './components/UserProfile.vue'
 import ChatRoom from './components/ChatRoom.vue'
 import ReminderSettings from './components/ReminderSettings.vue'
 import { useOnlineUsers } from './composables/useOnlineUsers'
+
+/* ✅ Use i18n for translations */
+const { t } = useI18n()
 
 /* ✅ Global composable state for online users */
 const { 
@@ -290,7 +294,7 @@ function handleTrackerReminder(data) {
   speakReminder(data)
 }
 
-/* 🔊 Speak reminder using Web Speech API */
+/* 🔊 Speak reminder using Web Speech API with i18n */
 function speakReminder(data) {
   if (!window.speechSynthesis) {
     console.warn('[Reminder] Speech synthesis not supported')
@@ -302,15 +306,18 @@ function speakReminder(data) {
   const rate = parseFloat(localStorage.getItem('reminderRate') || '1.0')
   const pitch = parseFloat(localStorage.getItem('reminderPitch') || '1.0')
 
-  // Get current locale
+  // Get phase number from status
+  const phaseNumber = Math.floor(Number(data.status || 1))
+
+  // Build text using i18n
+  const levelText = t('reminder.level')
+  const channelText = t('reminder.channel')
+  const phaseText = t('reminder.phase')
+
+  const text = `${levelText} ${data.level}, ${channelText} ${data.channelId}, ${phaseText} ${phaseNumber}`
+
+  // Get language for speech synthesis
   const currentLocale = localStorage.getItem('locale') || 'zh'
-
-  // Create text based on locale
-  const text = currentLocale === 'zh' ? `等級 ${data.level}，頻道 ${data.channelId}` :
-               currentLocale === 'ja' ? `レベル ${data.level}、チャンネル ${data.channelId}` :
-               `Level ${data.level}, Channel ${data.channelId}`
-
-  // Set language based on locale
   const lang = currentLocale === 'zh' ? 'zh-TW' :
                currentLocale === 'ja' ? 'ja-JP' :
                'en-US'

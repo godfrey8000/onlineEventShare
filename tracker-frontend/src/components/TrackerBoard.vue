@@ -2780,7 +2780,7 @@ onBeforeUnmount(() => {
 
 .list-header {
   display: grid;
-  grid-template-columns: 45px minmax(100px, 180px) 50px 60px 95px 130px 35px 65px 65px 90px auto;
+  grid-template-columns: 45px minmax(100px, 180px) 65px 60px 95px 220px 35px 75px 75px 90px 60px;
   gap: 8px;
   align-items: center;
   padding: 10px 16px;
@@ -2820,7 +2820,7 @@ onBeforeUnmount(() => {
 
 .list-row {
   display: grid;
-  grid-template-columns: 45px minmax(100px, 180px) 50px 60px 95px 130px 35px 65px 65px 90px auto;
+  grid-template-columns: 45px minmax(100px, 180px) 65px 60px 95px 220px 35px 75px 75px 90px 60px;
   gap: 8px;
   align-items: center;
   padding: 10px 16px;

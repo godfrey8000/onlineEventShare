@@ -8,7 +8,8 @@ import authRoutes from './routes/auth.routes.js';
 import episodesRoutes from './routes/episodes.routes.js';
 import trackersRoutes from './routes/trackers.routes.js';
 import mapsRoutes from './routes/maps.routes.js';
-import chatRoutes from './routes/chat.routes.js';  // ✅ Add this
+import chatRoutes from './routes/chat.routes.js';
+import reminderSettingsRoutes from './routes/reminderSettings.routes.js';
 import { createSocket } from './socket.js';
 import { scheduleHousekeeping, runHousekeeping } from './jobs/housekeeping.js';
 import { startCountdownChecker } from './jobs/countdownChecker.js';
@@ -63,7 +64,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api', episodesRoutes);
 app.use('/api', trackersRoutes);
 app.use('/api', mapsRoutes);
-app.use('/api', chatRoutes);  // ✅ Add chat routes
+app.use('/api', chatRoutes);
+app.use('/api', reminderSettingsRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ ok: true }));

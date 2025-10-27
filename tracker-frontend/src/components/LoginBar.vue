@@ -30,6 +30,16 @@
         <span v-if="error" class="error-msg">{{ error }}</span>
       </template>
 
+      <!-- Global Reminder Settings -->
+      <button
+        @click="$emit('openReminderSettings')"
+        class="reminder-settings-btn"
+        :class="{ active: globalReminderEnabled }"
+        title="Reminder Settings"
+      >
+        {{ globalReminderEnabled ? '🔔' : '🔕' }} ⚙️
+      </button>
+
       <!-- Language Selector -->
       <select v-model="currentLocale" @change="changeLanguage" class="lang-select">
         <option value="en">English</option>
@@ -51,7 +61,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '../services/api'
 
@@ -63,7 +73,7 @@ const props = defineProps({
   role: String
 })
 
-const emit = defineEmits(['login', 'logout', 'openProfile'])
+const emit = defineEmits(['login', 'logout', 'openProfile', 'openReminderSettings'])
 
 // Login state
 const username = ref('')
@@ -73,6 +83,31 @@ const error = ref('')
 
 // Language state
 const currentLocale = ref(localStorage.getItem('locale') || 'zh')  // Default to Traditional Chinese
+
+// Global reminder state
+const globalReminderEnabled = ref(false)
+
+// Function to update reminder state from localStorage
+function updateReminderState() {
+  const saved = localStorage.getItem('globalReminderEnabled')
+  globalReminderEnabled.value = saved === 'true'
+}
+
+onMounted(() => {
+  // Load global reminder setting from localStorage
+  updateReminderState()
+
+  // Listen for storage events (when other components update localStorage)
+  window.addEventListener('storage', updateReminderState)
+
+  // Also listen for custom event from ReminderSettings
+  window.addEventListener('reminderSettingsChanged', updateReminderState)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('storage', updateReminderState)
+  window.removeEventListener('reminderSettingsChanged', updateReminderState)
+})
 
 // ✅ Login function with proper error handling
 async function login() {
@@ -145,6 +180,13 @@ function changeLanguage(event) {
     i18n.global.locale.value = locale
     console.log('Language changed to:', locale)
   })
+}
+
+// ✅ Toggle global reminder
+function toggleGlobalReminder() {
+  globalReminderEnabled.value = !globalReminderEnabled.value
+  localStorage.setItem('globalReminderEnabled', globalReminderEnabled.value.toString())
+  console.log('[Reminder] Global reminders:', globalReminderEnabled.value ? 'enabled' : 'disabled')
 }
 </script>
 
@@ -285,6 +327,28 @@ function changeLanguage(event) {
 .lang-select:focus {
   outline: none;
   border-color: #4caf50;
+}
+
+.reminder-settings-btn {
+  padding: 8px 12px;
+  background: #333;
+  border: 2px solid #666;
+  border-radius: 6px;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.reminder-settings-btn.active {
+  background: #4caf50;
+  border-color: #4caf50;
+  color: white;
+}
+
+.reminder-settings-btn:hover {
+  transform: scale(1.05);
+  background: #444;
 }
 
 .error-msg {

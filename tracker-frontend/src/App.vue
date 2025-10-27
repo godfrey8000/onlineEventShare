@@ -8,6 +8,7 @@
       @login="handleLogin"
       @logout="handleLogout"
       @openProfile="showProfile = !showProfile"
+      @openReminderSettings="showReminderSettings = !showReminderSettings"
     />
 
     <!-- 👤 Profile Overlay -->
@@ -21,6 +22,20 @@
           :token="token"
           :nickname="nickname"
           @updated="handleProfileUpdate"
+        />
+      </div>
+    </transition>
+
+    <!-- 🔔 Reminder Settings Overlay -->
+    <transition name="fade">
+      <div
+        v-if="showReminderSettings"
+        class="reminder-overlay"
+        @click.self="showReminderSettings = false"
+      >
+        <ReminderSettings
+          :token="token"
+          @close="showReminderSettings = false"
         />
       </div>
     </transition>
@@ -101,13 +116,15 @@ import {
   offTrackerDeleted,
   onUserUpdated,
   offUserUpdated,
-  onSocketReady
+  onSocketReady,
+  getSocket
 } from './services/socket'
 import LoginBar from './components/LoginBar.vue'
 import TrackerBoard from './components/TrackerBoard.vue'
 import AddTracker from './components/AddTracker.vue'
 import UserProfile from './components/UserProfile.vue'
 import ChatRoom from './components/ChatRoom.vue'
+import ReminderSettings from './components/ReminderSettings.vue'
 import { useOnlineUsers } from './composables/useOnlineUsers'
 
 /* ✅ Global composable state for online users */
@@ -128,6 +145,7 @@ const trackers = ref([])
 const lastUpdate = ref(Date.now())
 const showProfile = ref(false)
 const showUsers = ref(false)
+const showReminderSettings = ref(false)
 
 /* 🔒 Permission checks */
 const canEdit = computed(() => ['EDITOR', 'ADMIN'].includes(role.value))
@@ -250,6 +268,64 @@ function handleUserUpdated(updatedUser) {
   lastUpdate.value = Date.now()
 }
 
+/* 🔔 Handle reminder events (phase 0→1 transition) */
+function handleTrackerReminder(data) {
+  console.log('[App] Received reminder event:', data)
+
+  // Check if global reminders are enabled
+  const globalEnabled = localStorage.getItem('globalReminderEnabled') === 'true'
+  if (!globalEnabled) {
+    console.log('[Reminder] Global reminders disabled, skipping')
+    return
+  }
+
+  // Check if reminder is enabled for this specific tracker
+  const trackerReminders = JSON.parse(localStorage.getItem('trackerReminders') || '{}')
+  if (!trackerReminders[data.id]) {
+    console.log('[Reminder] Reminder disabled for tracker:', data.id)
+    return
+  }
+
+  // Speak the reminder
+  speakReminder(data)
+}
+
+/* 🔊 Speak reminder using Web Speech API */
+function speakReminder(data) {
+  if (!window.speechSynthesis) {
+    console.warn('[Reminder] Speech synthesis not supported')
+    return
+  }
+
+  // Load settings from localStorage
+  const volume = parseFloat(localStorage.getItem('reminderVolume') || '1.0')
+  const rate = parseFloat(localStorage.getItem('reminderRate') || '1.0')
+  const pitch = parseFloat(localStorage.getItem('reminderPitch') || '1.0')
+
+  // Get current locale
+  const currentLocale = localStorage.getItem('locale') || 'zh'
+
+  // Create text based on locale
+  const text = currentLocale === 'zh' ? `等級 ${data.level}，頻道 ${data.channelId}` :
+               currentLocale === 'ja' ? `レベル ${data.level}、チャンネル ${data.channelId}` :
+               `Level ${data.level}, Channel ${data.channelId}`
+
+  // Set language based on locale
+  const lang = currentLocale === 'zh' ? 'zh-TW' :
+               currentLocale === 'ja' ? 'ja-JP' :
+               'en-US'
+
+  console.log('[Reminder] Speaking:', text, 'Language:', lang)
+
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = lang
+  utterance.rate = rate
+  utterance.pitch = pitch
+  utterance.volume = volume
+
+  window.speechSynthesis.speak(utterance)
+}
+
 /* 📤 User action handlers */
 function handleTrackerAdded(newTracker) {
   // Optimistic update - will be confirmed by socket event
@@ -300,6 +376,10 @@ onMounted(() => {
     onTrackerUpdated(handleTrackerUpdated)
     onTrackerDeleted(handleTrackerDeleted)
     onUserUpdated(handleUserUpdated)
+
+    // ✅ Listen for phase transition reminders
+    socket.on('tracker:reminder', handleTrackerReminder)
+
     console.log('[App] Event listeners registered successfully')
   })
 
@@ -326,6 +406,16 @@ onBeforeUnmount(() => {
 }
 
 .profile-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.reminder-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.7);

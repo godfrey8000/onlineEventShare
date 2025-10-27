@@ -52,6 +52,15 @@ export async function checkExpiredCountdowns(io) {
       if (io) {
         console.log(`[CountdownChecker] Broadcasting tracker:changed:global for tracker ${tracker.id}`);
         io.emit('tracker:changed:global', updated);
+
+        // ✅ Emit reminder event for phase 0→1 transition
+        console.log('[CountdownChecker] Emitting phase transition reminder:', updated.id);
+        io.emit('tracker:reminder', {
+          id: updated.id,
+          level: updated.level,
+          channelId: updated.channelId,
+          mapName: updated.map?.name
+        });
       }
 
       return updated;

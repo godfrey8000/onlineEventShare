@@ -29,15 +29,28 @@ model ChatMessage {
 }
 
 model User {
-  id        Int           @id @default(autoincrement())
-  username  String        @unique
-  password  String
-  nickname  String?
-  role      Role          @default(VIEWER)
-  createdAt DateTime      @default(now())
-  messages  ChatMessage[]
-  favorites MapFavorite[]
-  trackers  Tracker[]
+  id               Int              @id @default(autoincrement())
+  username         String           @unique
+  password         String
+  nickname         String?
+  role             Role             @default(VIEWER)
+  createdAt        DateTime         @default(now())
+  messages         ChatMessage[]
+  favorites        MapFavorite[]
+  trackers         Tracker[]
+  reminderSettings ReminderSettings?
+}
+
+model ReminderSettings {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  enabled   Boolean  @default(true)
+  volume    Float    @default(1.0)
+  rate      Float    @default(1.0)
+  pitch     Float    @default(1.0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model MapFavorite {
@@ -74,7 +87,6 @@ model Tracker {
   updatedAt       DateTime  @updatedAt
   countdownEndsAt DateTime?  // For phase 0: countdown end time (future); For phase 1+: when phase 1 started (past)
   isFull          Boolean   @default(false)
-  reminderEnabled Boolean   @default(false) // Voice reminder when phase changes from 0 to 1
   episode         Episode   @relation(fields: [episodeNumber], references: [episodeId])
   map             Map       @relation(fields: [mapId], references: [id])
   user            User?     @relation(fields: [userId], references: [id])

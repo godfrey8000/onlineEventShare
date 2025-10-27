@@ -89,6 +89,10 @@ export const api = {
   getChatStats: () => API.get('/chat/stats'),
   sendMessage: (content) => API.post('/chat/send', { content }),
   deleteMessage: (id) => API.delete(`/chat/${id}`),
+
+  // Reminder Settings
+  getReminderSettings: () => API.get('/reminder-settings'),
+  saveReminderSettings: (data) => API.post('/reminder-settings', data),
 }
 
 export default API

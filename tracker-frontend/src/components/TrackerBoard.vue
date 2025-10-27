@@ -180,6 +180,9 @@
         <span class="list-header-cell">{{ t('tracker.full') }}</span>
         <span class="list-header-cell">{{ t('tracker.status') }}</span>
         <span class="list-header-cell">{{ t('tracker.countdown') }}</span>
+        <span class="list-header-cell list-header-reminder" @click="toggleAllReminders" title="Toggle all reminders">
+          🔔
+        </span>
         <span class="list-header-cell">{{ t('tracker.updated') }}</span>
         <span class="list-header-cell">{{ t('tracker.created') }}</span>
         <span class="list-header-cell">{{ t('tracker.user') }}</span>
@@ -218,6 +221,17 @@
                 :disabled="!canEdit || (!editMode[tracker.id] && !rapidEditMode)"
               />
               <span>👥 {{ t('tracker.mapFull') }}</span>
+            </label>
+
+            <!-- Reminder Toggle -->
+            <label class="reminder-toggle" :title="isReminderEnabled(tracker.id) ? 'Reminder enabled' : 'Reminder disabled'">
+              <input
+                type="checkbox"
+                :checked="isReminderEnabled(tracker.id)"
+                @change="toggleReminder(tracker)"
+              />
+              <span>{{ isReminderEnabled(tracker.id) ? '🔔' : '🔕' }}</span>
+              <span class="reminder-label">Remind</span>
             </label>
 
             <!-- Progress Circle -->
@@ -512,6 +526,15 @@
             <div class="list-countdown">
               <!-- Show countdown controls in rapid edit mode (for all phases) -->
               <div v-if="rapidEditMode && canEdit" class="list-countdown-edit">
+                <!-- Show current countdown/phase time -->
+                <span v-if="tracker.countdownEndsAt && Number(tracker.status) < 1" class="countdown-text-inline">
+                  ⏱️{{ getCountdownText(tracker.countdownEndsAt) }}
+                </span>
+                <span v-else-if="tracker.countdownEndsAt && Number(tracker.status) >= 1" class="phase-one-text-inline">
+                  🕐{{ getPhaseOneElapsedText(tracker.countdownEndsAt) }}
+                </span>
+
+                <!-- Input and buttons -->
                 <input
                   v-model="countdownMinutes[tracker.id]"
                   type="text"
@@ -543,6 +566,18 @@
                 🕐 {{ getPhaseOneElapsedText(tracker.countdownEndsAt) }}
               </span>
               <span v-else class="countdown-empty">-</span>
+            </div>
+
+            <!-- Reminder Toggle -->
+            <div class="list-reminder">
+              <button
+                @click="toggleReminder(tracker)"
+                class="list-reminder-btn"
+                :class="{ active: isReminderEnabled(tracker.id) }"
+                :title="isReminderEnabled(tracker.id) ? 'Reminder enabled' : 'Reminder disabled'"
+              >
+                {{ isReminderEnabled(tracker.id) ? '🔔' : '🔕' }}
+              </button>
             </div>
 
             <span class="list-time" :style="{ color: getTimestampColor(tracker.updatedAt) }">
@@ -1075,16 +1110,7 @@ function getPhaseOneElapsedText(countdownEndsAt) {
 
 // Get placeholder text for countdown input showing current value
 function getCountdownPlaceholder(tracker) {
-  if (tracker.countdownEndsAt) {
-    if (Number(tracker.status) < 1) {
-      // Phase 0: show countdown time
-      return getCountdownText(tracker.countdownEndsAt)
-    } else {
-      // Phase 1+: show elapsed time
-      return getPhaseOneElapsedText(tracker.countdownEndsAt)
-    }
-  }
-  // No countdown set, show default placeholder
+  // Always show simple placeholder (current time is shown separately)
   return Number(tracker.status) < 1 ? '480' : '10'
 }
 
@@ -1569,6 +1595,81 @@ async function deleteTracker(tracker) {
   }
 }
 
+// ✅ Reminder management with localStorage
+// Reactive ref to track reminder state changes
+const reminderToggleCounter = ref(0)
+
+// Get reminder enabled state for a tracker from localStorage
+function isReminderEnabled(trackerId) {
+  // Access the counter to make this reactive
+  reminderToggleCounter.value
+  const trackerReminders = JSON.parse(localStorage.getItem('trackerReminders') || '{}')
+  return trackerReminders[trackerId] === true
+}
+
+// Set reminder enabled state for a tracker in localStorage
+function setReminderEnabled(trackerId, enabled) {
+  const trackerReminders = JSON.parse(localStorage.getItem('trackerReminders') || '{}')
+  if (enabled) {
+    trackerReminders[trackerId] = true
+  } else {
+    delete trackerReminders[trackerId]
+  }
+  localStorage.setItem('trackerReminders', JSON.stringify(trackerReminders))
+
+  // Trigger reactivity
+  reminderToggleCounter.value++
+}
+
+// Toggle reminder for a tracker
+function toggleReminder(tracker) {
+  const currentState = isReminderEnabled(tracker.id)
+  setReminderEnabled(tracker.id, !currentState)
+
+  console.log('[Reminder] Tracker', tracker.id, 'reminder:', !currentState ? 'enabled' : 'disabled')
+}
+
+// Toggle ALL trackers' reminders on/off
+function toggleAllReminders() {
+  const trackerReminders = JSON.parse(localStorage.getItem('trackerReminders') || '{}')
+  const allTrackerIds = props.trackers.map(t => t.id)
+
+  // Check if any tracker has reminder enabled
+  const anyEnabled = allTrackerIds.some(id => trackerReminders[id] === true)
+
+  if (anyEnabled) {
+    // Disable all
+    allTrackerIds.forEach(id => delete trackerReminders[id])
+    console.log('[Reminder] Disabled all tracker reminders')
+  } else {
+    // Enable all
+    allTrackerIds.forEach(id => trackerReminders[id] = true)
+    console.log('[Reminder] Enabled all tracker reminders')
+  }
+
+  localStorage.setItem('trackerReminders', JSON.stringify(trackerReminders))
+  reminderToggleCounter.value++
+}
+
+// Clean up reminders for deleted trackers (optional housekeeping)
+function cleanupTrackerReminders() {
+  const trackerReminders = JSON.parse(localStorage.getItem('trackerReminders') || '{}')
+  const currentTrackerIds = new Set(props.trackers.map(t => t.id))
+
+  let needsUpdate = false
+  Object.keys(trackerReminders).forEach(trackerId => {
+    if (!currentTrackerIds.has(Number(trackerId))) {
+      delete trackerReminders[trackerId]
+      needsUpdate = true
+    }
+  })
+
+  if (needsUpdate) {
+    localStorage.setItem('trackerReminders', JSON.stringify(trackerReminders))
+    console.log('[Reminder] Cleaned up old tracker reminders')
+  }
+}
+
 // ✅ Countdown expiration is now handled by backend countdown checker job (every 10s)
 // The backend job updates status to 1 and keeps countdownEndsAt as phase 1 start time
 // All clients receive updates via Socket.io, so no need for frontend auto-update
@@ -1576,6 +1677,9 @@ async function deleteTracker(tracker) {
 // ✅ Load data on mount
 onMounted(() => {
   fetchData()
+
+  // ✅ Clean up old tracker reminders
+  cleanupTrackerReminders()
 
   // ✅ Update currentTime every second for real-time timestamp updates
   timeUpdateInterval = setInterval(() => {
@@ -2433,6 +2537,37 @@ onBeforeUnmount(() => {
   opacity: 0.5;
 }
 
+.reminder-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: #aaa;
+  padding: 4px 8px;
+  background: #2a2a2a;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.reminder-toggle:hover {
+  background: #333;
+}
+
+.reminder-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.reminder-toggle span:first-of-type {
+  font-size: 16px;
+}
+
+.reminder-label {
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
 .simple-full-checkbox {
   display: flex;
   align-items: center;
@@ -2645,8 +2780,8 @@ onBeforeUnmount(() => {
 
 .list-header {
   display: grid;
-  grid-template-columns: 50px 1fr 60px 70px 110px 140px 70px 70px 100px 100px;
-  gap: 12px;
+  grid-template-columns: 45px minmax(100px, 180px) 50px 60px 95px 130px 35px 65px 65px 90px auto;
+  gap: 8px;
   align-items: center;
   padding: 10px 16px;
   background: #1a1a1a;
@@ -2673,10 +2808,20 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
+.list-header-reminder {
+  cursor: pointer;
+  transition: transform 0.2s, filter 0.2s;
+}
+
+.list-header-reminder:hover {
+  transform: scale(1.2);
+  filter: brightness(1.5);
+}
+
 .list-row {
   display: grid;
-  grid-template-columns: 50px 1fr 60px 70px 110px 140px 70px 70px 100px 100px;
-  gap: 12px;
+  grid-template-columns: 45px minmax(100px, 180px) 50px 60px 95px 130px 35px 65px 65px 90px auto;
+  gap: 8px;
   align-items: center;
   padding: 10px 16px;
   background: #2a2a2a;
@@ -2797,10 +2942,11 @@ onBeforeUnmount(() => {
   gap: 4px;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .list-countdown-input {
-  width: 55px;
+  width: 45px;
   padding: 4px 6px;
   background: #2a2a2a;
   border: 1px solid #444;
@@ -2852,10 +2998,52 @@ onBeforeUnmount(() => {
   background: #d32f2f;
 }
 
+.list-reminder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.list-reminder-btn {
+  padding: 4px 8px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.list-reminder-btn:hover {
+  background: #333;
+  border-color: #666;
+}
+
+.list-reminder-btn.active {
+  background: #4caf50;
+  border-color: #4caf50;
+}
+
 .countdown-text {
   color: #ff9800;
   font-weight: 600;
   font-size: 14px;
+}
+
+.countdown-text-inline {
+  color: #ff9800;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.phase-one-text-inline {
+  color: #4caf50;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+  margin-right: 4px;
 }
 
 .phase-one-text {

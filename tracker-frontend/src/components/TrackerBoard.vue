@@ -895,12 +895,12 @@ function compareByCountdown(a, b, aCache, bCache) {
 
   // Both post-cooldown: longer elapsed time (earlier countdownEndsAt) goes higher
   if (aIsPostCooldown && bIsPostCooldown) {
-    return aTime - bTime // Earlier time = more elapsed = higher priority
+    return aTime - bTime // Earlier time = more elapsed = higher priority (smaller return = higher)
   }
 
   // Both pre-cooldown: longer remaining time (later countdownEndsAt) goes lower
   if (!aIsPostCooldown && !bIsPostCooldown) {
-    return bTime - aTime // Later time = more remaining = lower priority
+    return aTime - bTime // Later time = more remaining = lower priority (larger return = lower)
   }
 
   // Mixed: post-cooldown goes higher than pre-cooldown

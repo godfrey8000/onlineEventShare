@@ -827,9 +827,15 @@ const sortedTrackers = computed(() => {
       case 'nickname':
         aVal = aCache ? (aCache.nickname || '') : (a.nickname || '')
         bVal = bCache ? (bCache.nickname || '') : (b.nickname || '')
-        return sortOrder.value === 'asc'
+        const nicknameResult = sortOrder.value === 'asc'
           ? aVal.localeCompare(bVal)
           : bVal.localeCompare(aVal)
+
+        // Secondary sort by countdown if nicknames are equal
+        if (nicknameResult === 0) {
+          return compareByCountdown(a, b, aCache, bCache)
+        }
+        return nicknameResult
       case 'countdown':
         // Sort by countdown time (smallest/closest to expire first)
         // Trackers without countdown go to the end
@@ -850,11 +856,56 @@ const sortedTrackers = computed(() => {
         return 0
     }
 
-    return sortOrder.value === 'asc' ? aVal - bVal : bVal - aVal
+    const primaryResult = sortOrder.value === 'asc' ? aVal - bVal : bVal - aVal
+
+    // Secondary sort by countdown if primary values are equal
+    if (primaryResult === 0) {
+      return compareByCountdown(a, b, aCache, bCache)
+    }
+
+    return primaryResult
   })
 
   return sorted
 })
+
+// 🔄 Secondary sort helper: Compare by countdown time
+// Post-cooldown (CD+) with longer elapsed time goes higher
+// Pre-cooldown with longer remaining time goes lower
+function compareByCountdown(a, b, aCache, bCache) {
+  const aData = aCache || a
+  const bData = bCache || b
+
+  const aStatus = Number(aData.status)
+  const bStatus = Number(bData.status)
+
+  const aCountdown = aData.countdownEndsAt
+  const bCountdown = bData.countdownEndsAt
+
+  // No countdown data: send to bottom
+  if (!aCountdown && !bCountdown) return 0
+  if (!aCountdown) return 1
+  if (!bCountdown) return -1
+
+  const aTime = new Date(aCountdown).getTime()
+  const bTime = new Date(bCountdown).getTime()
+
+  const aIsPostCooldown = aStatus >= 1
+  const bIsPostCooldown = bStatus >= 1
+
+  // Both post-cooldown: longer elapsed time (earlier countdownEndsAt) goes higher
+  if (aIsPostCooldown && bIsPostCooldown) {
+    return aTime - bTime // Earlier time = more elapsed = higher priority
+  }
+
+  // Both pre-cooldown: longer remaining time (later countdownEndsAt) goes lower
+  if (!aIsPostCooldown && !bIsPostCooldown) {
+    return bTime - aTime // Later time = more remaining = lower priority
+  }
+
+  // Mixed: post-cooldown goes higher than pre-cooldown
+  return aIsPostCooldown ? -1 : 1
+}
 
 // ✅ Helper functions
 function getMapName(mapId) {

@@ -154,10 +154,10 @@
         <input
           v-model="quickAddCountdown"
           type="text"
-          placeholder="⏱️ 480 or 53000"
+          placeholder="⏱️ 45 or 530"
           class="quick-add-countdown-input"
           @keyup.enter="handleQuickAdd"
-          :title="'Countdown time:\n• Phase < 1: future time (e.g., 480 = countdown for 8h)\n• Phase ≥ 1: past time (e.g., 10 = phase 1 started 10 minutes ago)\nFormat: Plain minutes (480) or hhmmss (53000 = 5h30m)'"
+          :title="'Countdown time formats:\n• Minutes: 45 (45 minutes)\n• Hours: 530 (5h 30m) or 1230 (12h 30m)\n\nPhase < 1: Sets countdown timer\nPhase ≥ 1: Sets when phase 1 started'"
         />
         <button @click="handleQuickAdd" class="quick-add-btn" :disabled="!quickAddInput">
           {{ t('tracker.add') }}
@@ -540,7 +540,7 @@
                   type="text"
                   :placeholder="getCountdownPlaceholder(tracker)"
                   class="list-countdown-input"
-                  :title="Number(tracker.status) < 1 ? 'Enter minutes (480) or hhmmss (53000 = 5h30m)' : 'Enter minutes ago when phase 1 started'"
+                  :title="Number(tracker.status) < 1 ? 'Minutes: 45 / Hours: 530 (5h30m) / 1230 (12h30m)' : 'Minutes ago when phase 1 started'"
                 />
                 <button
                   @click="setCountdown(tracker)"
@@ -1079,32 +1079,49 @@ function formatStatus(status) {
 }
 
 // ✅ Parse time input - supports multiple formats:
-// - Plain minutes: 480 -> 480 minutes
-// - hhmmss format: 53000 -> 5h 30m 0s, 64000 -> 6h 40m 0s, 12030 -> 1h 20m 30s
+// - 1-2 digits: Minutes (e.g., "5" = 5m, "45" = 45m, "90" = 90m)
+// - 3 digits: Hmm format (e.g., "530" = 5h 30m, "145" = 1h 45m)
+// - 4+ digits: HHmm format (e.g., "1230" = 12h 30m, "0545" = 5h 45m)
 function parseTimeInput(input) {
   if (!input) return 0
 
   const str = String(input).trim()
 
-  // Check if it's plain minutes (less than 4 digits or no pattern match)
-  if (str.length <= 3) {
+  // 1-2 digits: Parse as minutes
+  // Examples: "5" = 5 mins, "45" = 45 mins, "90" = 90 mins
+  if (str.length <= 2) {
     return parseInt(str, 10) || 0
   }
 
-  // Try hhmmss format (4-6 digits)
-  // Examples: 53000 = 05:30:00, 64000 = 06:40:00, 12030 = 01:20:30
-  const padded = str.padStart(6, '0') // Ensure 6 digits
-  const hours = parseInt(padded.slice(0, 2), 10)
-  const minutes = parseInt(padded.slice(2, 4), 10)
-  const seconds = parseInt(padded.slice(4, 6), 10)
+  // 3 digits: Parse as Hmm (H hours mm minutes)
+  // Examples: "530" = 5h 30m = 330 mins, "145" = 1h 45m = 105 mins
+  if (str.length === 3) {
+    const hours = parseInt(str[0], 10)
+    const minutes = parseInt(str.slice(1), 10)
 
-  // Validate ranges
-  if (minutes >= 60 || seconds >= 60) {
-    return null // Invalid format
+    // Validate minutes range
+    if (minutes >= 60) {
+      return null // Invalid format
+    }
+
+    return hours * 60 + minutes
   }
 
-  // Convert to total minutes (including fractional minutes from seconds)
-  return hours * 60 + minutes + (seconds / 60)
+  // 4+ digits: Parse as HHmm (HH hours mm minutes)
+  // Examples: "1230" = 12h 30m = 750 mins, "0545" = 5h 45m = 345 mins
+  if (str.length >= 4) {
+    const hours = parseInt(str.slice(0, -2), 10)
+    const minutes = parseInt(str.slice(-2), 10)
+
+    // Validate minutes range
+    if (minutes >= 60) {
+      return null // Invalid format
+    }
+
+    return hours * 60 + minutes
+  }
+
+  return 0
 }
 
 // ✅ Countdown timer helpers
